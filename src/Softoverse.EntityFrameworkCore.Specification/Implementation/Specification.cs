@@ -38,6 +38,8 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
 
     public Expression<Func<TEntity, object>>? OrderByExpression { get; set; }
     public Expression<Func<TEntity, object>>? OrderByDescendingExpression { get; set; }
+    
+    public Expression<Func<TEntity, object>>? ProjectionExpression { get; set; }
 
     public void AddInclude(Expression<Func<TEntity, object>> includeExpression) => IncludeExpressions.Add(includeExpression);
 
@@ -46,6 +48,8 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
     public void AddOrderBy(Expression<Func<TEntity, object>> orderByExpression) => OrderByExpression = orderByExpression;
 
     public void AddOrderByDescending(Expression<Func<TEntity, object>> orderByDescendingExpression) => OrderByDescendingExpression = orderByDescendingExpression;
+    
+    public void AddProjection(Expression<Func<TEntity, object>> projectionExpression) => ProjectionExpression = projectionExpression;
 
     public static Expression<Func<TEntity, bool>> ToConditionalExpression<TProperty>(Expression<Func<TEntity, TProperty>> propertySelector, string value, Expression<Func<TEntity, bool>>? defaultExpression)
     {

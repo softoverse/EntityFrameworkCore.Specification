@@ -5,6 +5,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <RootNamespace>Softoverse.Specification</RootNamespace>
+        <Version>1.1.0</Version>
     </PropertyGroup>
 
     <PropertyGroup>

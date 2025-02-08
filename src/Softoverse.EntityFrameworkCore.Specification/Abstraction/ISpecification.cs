@@ -15,6 +15,7 @@ public interface ISpecification<TEntity> : ISpecificationForPrimaryKey where TEn
     public Expression<Func<TEntity, object>>? OrderByExpression { get; }
 
     public Expression<Func<TEntity, object>>? OrderByDescendingExpression { get; }
+    public Expression<Func<TEntity, object>>? ProjectionExpression { get; }
 
     public void AddInclude(Expression<Func<TEntity, object>> includeExpression);
 
