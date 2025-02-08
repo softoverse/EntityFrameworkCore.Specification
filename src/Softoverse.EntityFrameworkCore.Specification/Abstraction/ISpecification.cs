@@ -24,13 +24,3 @@ public interface ISpecification<TEntity> : ISpecificationForPrimaryKey where TEn
 
     public void AddOrderByDescending(Expression<Func<TEntity, object>> orderByDescendingExpression);
 }
-
-public interface ISpecificationForPrimaryKey
-{
-    object? PrimaryKey { get; }
-}
-
-public interface ISpecificationRequest<TEntity> where TEntity : class
-{
-    ISpecification<TEntity> GetSpecification(bool asNoTracking = false, bool asSplitQuery = false);
-}

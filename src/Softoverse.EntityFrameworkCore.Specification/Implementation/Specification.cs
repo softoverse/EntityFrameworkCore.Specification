@@ -47,20 +47,14 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
 
     public void AddOrderByDescending(Expression<Func<TEntity, object>> orderByDescendingExpression) => OrderByDescendingExpression = orderByDescendingExpression;
 
-    public static Expression<Func<TEntity, bool>> GenerateConditionalExpression<TProperty>(Expression<Func<TEntity, TProperty>> propertySelector, string value, Expression<Func<TEntity, bool>>? defaultExpression)
+    public static Expression<Func<TEntity, bool>> ToConditionalExpression<TProperty>(Expression<Func<TEntity, TProperty>> propertySelector, string value, Expression<Func<TEntity, bool>>? defaultExpression)
     {
-        // Local function to determine if the value is a query string
-        static bool IsQueryString(string? value)
-        {
-            return !string.IsNullOrEmpty(value) && !string.IsNullOrWhiteSpace(value) && value.Contains(":");
-        }
-
         // If not a query string, return the default query
         if (!IsQueryString(value))
         {
             return defaultExpression ?? throw new ArgumentException($"'defaultExpression' was not being provided for the given value: {value} and also did not contain a query sting");
         }
-
+        
         const string lessThan = "lt";
         const string lessThanOrEqual = "lte";
         const string greaterThan = "gt";
@@ -86,79 +80,6 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
         const string ninLikeCaseInsensitive = "ninlikeci";
 
         const char splitBy = ',';
-
-        // Local function to build comparison expressions
-        static Expression BuildComparisonExpression(Expression property, string condition, object constantValue, Type targetType)
-        {
-            Func<Expression, Expression, BinaryExpression> comparison = condition switch
-            {
-                lessThan => Expression.LessThan,
-                lessThanOrEqual => Expression.LessThanOrEqual,
-                greaterThan => Expression.GreaterThan,
-                greaterThanOrEqual => Expression.GreaterThanOrEqual,
-                equal => Expression.Equal,
-                notEqual => Expression.NotEqual,
-                _ => throw new ArgumentException($"Unsupported condition: {condition}")
-            };
-
-            return comparison(property, Expression.Constant(constantValue, targetType));
-        }
-
-        // Local function to convert a string to the appropriate target type
-        static object ConvertToType(string input, Type targetType)
-        {
-            if (targetType == typeof(DateTime) || targetType == typeof(DateTimeOffset))
-            {
-                if (DateTime.TryParse(input, out DateTime dateTimeValue))
-                {
-                    return dateTimeValue;
-                }
-                throw new ArgumentException($"Invalid DateTime format for value: {input}");
-            }
-
-            return Convert.ChangeType(input, targetType);
-        }
-
-        // Local function to create an 'in', 'nin', 'inci', 'ninci', 'inlike', 'inlikeci', 'ninlike', 'ninlikeci' condition using HashSet<T>
-        static Expression BuildInExpression(Expression property, string[] values, Type targetType, bool isNotIn, bool caseInsensitive = false, bool isLike = false)
-        {
-            // Convert the property to lowercase if case-insensitive comparison is needed
-            if (caseInsensitive && targetType == typeof(string))
-            {
-                property = Expression.Call(property, nameof (string.ToLower), Type.EmptyTypes);
-            }
-
-            // For 'inlike' and 'ninlike' operations (pattern matching using 'Contains')
-            if (isLike && targetType == typeof(string))
-            {
-                // Convert the values to the appropriate type
-                var inValues = new HashSet<string>(values.Select(v => caseInsensitive ? v.ToLower() : v));
-
-                var containsExpressions = inValues.Select(value =>
-                                                              Expression.Call(property, typeof(string).GetMethod(nameof (string.Contains), [typeof(string)])!, Expression.Constant(value)) as Expression
-                                                         ).ToList();
-
-                if (!containsExpressions.Any())
-                {
-                    return isNotIn ? Expression.Constant(true) : Expression.Constant(false);
-                }
-
-                var combinedExpression = containsExpressions.Aggregate(Expression.OrElse);
-                return isNotIn ? Expression.Not(combinedExpression) : combinedExpression;
-            }
-            else
-            {
-                // Convert the values to the appropriate type
-                var inValues = new HashSet<TProperty>(values.Select(v => (TProperty)ConvertToType(v, targetType)));
-
-                // For regular 'in' or 'nin' operations
-                var inList = Expression.Constant(inValues);
-                var containsMethod = typeof(HashSet<TProperty>).GetMethod(nameof (HashSet<TProperty>.Contains), [property.Type]);
-
-                var containsExpression = Expression.Call(inList, containsMethod!, property);
-                return isNotIn ? Expression.Not(containsExpression) : containsExpression;
-            }
-        }
 
         var splitValues = value.Split(':');
         var condition = splitValues[0].ToLower();
@@ -250,6 +171,86 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
 
             _ => defaultExpression ?? throw new ArgumentException($"'defaultExpression' was not being provided for the given value: {value}")
         };
+
+        // Local function to determine if the value is a query string
+        static bool IsQueryString(string? value)
+        {
+            return !string.IsNullOrEmpty(value) && !string.IsNullOrWhiteSpace(value) && value.Contains(":");
+        }
+        
+        // Local function to build comparison expressions
+        static Expression BuildComparisonExpression(Expression property, string condition, object constantValue, Type targetType)
+        {
+            Func<Expression, Expression, BinaryExpression> comparison = condition switch
+            {
+                lessThan => Expression.LessThan,
+                lessThanOrEqual => Expression.LessThanOrEqual,
+                greaterThan => Expression.GreaterThan,
+                greaterThanOrEqual => Expression.GreaterThanOrEqual,
+                equal => Expression.Equal,
+                notEqual => Expression.NotEqual,
+                _ => throw new ArgumentException($"Unsupported condition: {condition}")
+            };
+
+            return comparison(property, Expression.Constant(constantValue, targetType));
+        }
+        
+        // Local function to convert a string to the appropriate target type
+        static object ConvertToType(string input, Type targetType)
+        {
+            if (targetType != typeof(DateTime) && targetType != typeof(DateTimeOffset))
+            {
+                return Convert.ChangeType(input, targetType);
+            }
+            
+            if (DateTime.TryParse(input, out DateTime dateTimeValue))
+            {
+                return dateTimeValue;
+            }
+            throw new ArgumentException($"Invalid DateTime format for value: {input}");
+
+        }
+        
+        // Local function to create an 'in', 'nin', 'inci', 'ninci', 'inlike', 'inlikeci', 'ninlike', 'ninlikeci' condition using HashSet<T>
+        static Expression BuildInExpression(Expression property, string[] values, Type targetType, bool isNotIn, bool caseInsensitive = false, bool isLike = false)
+        {
+            // Convert the property to lowercase if case-insensitive comparison is needed
+            if (caseInsensitive && targetType == typeof(string))
+            {
+                property = Expression.Call(property, nameof (string.ToLower), Type.EmptyTypes);
+            }
+
+            // For 'inlike' and 'ninlike' operations (pattern matching using 'Contains')
+            if (isLike && targetType == typeof(string))
+            {
+                // Convert the values to the appropriate type
+                var inValues = new HashSet<string>(values.Select(v => caseInsensitive ? v.ToLower() : v));
+
+                var containsExpressions = inValues.Select(value =>
+                                                              Expression.Call(property, typeof(string).GetMethod(nameof (string.Contains), [typeof(string)])!, Expression.Constant(value)) as Expression
+                                                         ).ToList();
+
+                if (!containsExpressions.Any())
+                {
+                    return isNotIn ? Expression.Constant(true) : Expression.Constant(false);
+                }
+
+                var combinedExpression = containsExpressions.Aggregate(Expression.OrElse);
+                return isNotIn ? Expression.Not(combinedExpression) : combinedExpression;
+            }
+            else
+            {
+                // Convert the values to the appropriate type
+                var inValues = new HashSet<TProperty>(values.Select(v => (TProperty)ConvertToType(v, targetType)));
+
+                // For regular 'in' or 'nin' operations
+                var inList = Expression.Constant(inValues);
+                var containsMethod = typeof(HashSet<TProperty>).GetMethod(nameof (HashSet<TProperty>.Contains), [property.Type]);
+
+                var containsExpression = Expression.Call(inList, containsMethod!, property);
+                return isNotIn ? Expression.Not(containsExpression) : containsExpression;
+            }
+        }
     }
 
 }
