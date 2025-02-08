@@ -1,5 +1,7 @@
 ﻿using System.Linq.Expressions;
 
+using Microsoft.EntityFrameworkCore.Query;
+
 using Softoverse.Specification.Abstraction;
 using Softoverse.Specification.Helpers;
 
@@ -38,8 +40,10 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
 
     public Expression<Func<TEntity, object>>? OrderByExpression { get; set; }
     public Expression<Func<TEntity, object>>? OrderByDescendingExpression { get; set; }
-    
+
     public Expression<Func<TEntity, object>>? ProjectionExpression { get; set; }
+
+    public Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> ExecuteUpdateExpression { get; set; }
 
     public void AddInclude(Expression<Func<TEntity, object>> includeExpression) => IncludeExpressions.Add(includeExpression);
 
@@ -48,8 +52,9 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
     public void AddOrderBy(Expression<Func<TEntity, object>> orderByExpression) => OrderByExpression = orderByExpression;
 
     public void AddOrderByDescending(Expression<Func<TEntity, object>> orderByDescendingExpression) => OrderByDescendingExpression = orderByDescendingExpression;
-    
-    public void AddProjection(Expression<Func<TEntity, object>> projectionExpression) => ProjectionExpression = projectionExpression;
+
+    public void SetProjection(Expression<Func<TEntity, object>> projectionExpression) => ProjectionExpression = projectionExpression;
+    public void SetExecuteUpdateExpression(Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> executeUpdateExpression) => ExecuteUpdateExpression = executeUpdateExpression;
 
     public static Expression<Func<TEntity, bool>> ToConditionalExpression<TProperty>(Expression<Func<TEntity, TProperty>> propertySelector, string value, Expression<Func<TEntity, bool>>? defaultExpression)
     {
@@ -58,7 +63,7 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
         {
             return defaultExpression ?? throw new ArgumentException($"'defaultExpression' was not being provided for the given value: {value} and also did not contain a query sting");
         }
-        
+
         const string lessThan = "lt";
         const string lessThanOrEqual = "lte";
         const string greaterThan = "gt";
@@ -181,7 +186,7 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
         {
             return !string.IsNullOrEmpty(value) && !string.IsNullOrWhiteSpace(value) && value.Contains(":");
         }
-        
+
         // Local function to build comparison expressions
         static Expression BuildComparisonExpression(Expression property, string condition, object constantValue, Type targetType)
         {
@@ -198,7 +203,7 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
 
             return comparison(property, Expression.Constant(constantValue, targetType));
         }
-        
+
         // Local function to convert a string to the appropriate target type
         static object ConvertToType(string input, Type targetType)
         {
@@ -206,7 +211,7 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
             {
                 return Convert.ChangeType(input, targetType);
             }
-            
+
             if (DateTime.TryParse(input, out DateTime dateTimeValue))
             {
                 return dateTimeValue;
@@ -214,7 +219,7 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
             throw new ArgumentException($"Invalid DateTime format for value: {input}");
 
         }
-        
+
         // Local function to create an 'in', 'nin', 'inci', 'ninci', 'inlike', 'inlikeci', 'ninlike', 'ninlikeci' condition using HashSet<T>
         static Expression BuildInExpression(Expression property, string[] values, Type targetType, bool isNotIn, bool caseInsensitive = false, bool isLike = false)
         {
