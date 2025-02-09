@@ -12,4 +12,5 @@ Specification<Country> specification =  new Specification<Country>(1, true, true
 ISpecification<Country> iSpecification = specification;
 
 // iSpecification.ExecuteUpdateProperties.Count;
+// iSpecification.Add
 

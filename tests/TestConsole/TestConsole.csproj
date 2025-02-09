@@ -9,6 +9,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\Softoverse.EntityFrameworkCore.Specification\Softoverse.EntityFrameworkCore.Specification.csproj"/>
+<!--        <PackageReference Include="Softoverse.EntityFrameworkCore.Specification"/>-->
     </ItemGroup>
 
 </Project>

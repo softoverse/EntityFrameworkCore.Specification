@@ -11,7 +11,7 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
 {
     private Specification() { }
 
-    public Specification(List<Expression<Func<TEntity, bool>>> expressions, CombineType combineType, bool asNoTracking = false, bool asSplitQuery = false)
+    public Specification(List<Expression<Func<TEntity, bool>>> expressions, CombineType combineType = CombineType.And, bool asNoTracking = false, bool asSplitQuery = false)
     {
         var criteria = combineType == CombineType.And
             ? expressions.CombineWithAnd()
