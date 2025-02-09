@@ -9,7 +9,7 @@ namespace Softoverse.EntityFrameworkCore.Specification.Implementation;
 
 public class Specification<TEntity> : ISpecification<TEntity> where TEntity : class
 {
-    private Specification() { }
+    public Specification() { }
 
     public Specification(List<Expression<Func<TEntity, bool>>> expressions, CombineType combineType = CombineType.And, bool asNoTracking = false, bool asSplitQuery = false)
     {
@@ -18,6 +18,7 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
             : expressions.CombineWithOr();
 
         Criteria = criteria;
+        PrimaryKey = null;
         AsNoTracking = asNoTracking;
         AsSplitQuery = asSplitQuery;
     }
@@ -25,15 +26,16 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
     public Specification(object? primaryKey, bool asNoTracking = false, bool asSplitQuery = false)
     {
         PrimaryKey = primaryKey;
+        Criteria = null;
         AsNoTracking = asNoTracking;
         AsSplitQuery = asSplitQuery;
     }
 
-    public object? PrimaryKey { get; protected set; }
-    public Expression<Func<TEntity, bool>>? Criteria { get; protected set; }
+    public object? PrimaryKey { get; set; }
+    public Expression<Func<TEntity, bool>>? Criteria { get; set; }
 
-    public bool AsSplitQuery { get; protected set; }
-    public bool AsNoTracking { get; protected set; }
+    public bool AsSplitQuery { get; set; }
+    public bool AsNoTracking { get; set; }
 
     public List<Expression<Func<TEntity, object>>> IncludeExpressions { get; } = [];
     public List<string> IncludeStrings { get; } = [];
