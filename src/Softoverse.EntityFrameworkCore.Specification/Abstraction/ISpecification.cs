@@ -1,9 +1,8 @@
 ﻿using System.Linq.Expressions;
 
 using Microsoft.EntityFrameworkCore.Query;
-using Microsoft.EntityFrameworkCore.Query.SqlExpressions;
 
-namespace Softoverse.Specification.Abstraction;
+namespace Softoverse.EntityFrameworkCore.Specification.Abstraction;
 
 public interface ISpecification<TEntity> : ISpecificationForPrimaryKey where TEntity : class
 {
@@ -19,15 +18,21 @@ public interface ISpecification<TEntity> : ISpecificationForPrimaryKey where TEn
 
     public Expression<Func<TEntity, object>>? OrderByDescendingExpression { get; }
     public Expression<Func<TEntity, object>>? ProjectionExpression { get; }
-    public Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> ExecuteUpdateExpression { get; }
+    public Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>>? ExecuteUpdateExpression { get; }
+    
+    public List<Expression<Func<TEntity, object>>> ExecuteUpdateProperties { get; }
 
-    public void AddInclude(Expression<Func<TEntity, object>> includeExpression);
+    void AddInclude(Expression<Func<TEntity, object>> includeExpression);
 
-    public void AddIncludeString(string includeString);
+    void AddIncludeString(string includeString);
 
-    public void AddOrderBy(Expression<Func<TEntity, object>> orderByExpression);
+    void AddOrderBy(Expression<Func<TEntity, object>> orderByExpression);
 
-    public void AddOrderByDescending(Expression<Func<TEntity, object>> orderByDescendingExpression);
+    void AddOrderByDescending(Expression<Func<TEntity, object>> orderByDescendingExpression);
 
     void SetProjection(Expression<Func<TEntity, object>> projectionExpression);
+
+    void SetExecuteUpdateExpression(Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> executeUpdateExpression);
+
+    void AddExecuteUpdateProperties(Expression<Func<TEntity, object>> propertySelector);
 }

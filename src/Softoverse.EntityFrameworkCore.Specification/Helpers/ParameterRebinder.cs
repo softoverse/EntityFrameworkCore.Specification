@@ -1,6 +1,6 @@
 ﻿using System.Linq.Expressions;
 
-namespace Softoverse.Specification.Helpers;
+namespace Softoverse.EntityFrameworkCore.Specification.Helpers;
 
 public class ParameterRebinder : ExpressionVisitor
 {

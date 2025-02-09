@@ -4,8 +4,22 @@
         <TargetFramework>net9.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <RootNamespace>Softoverse.Specification</RootNamespace>
-        <Version>1.2.0</Version>
+        <RootNamespace>Softoverse.EntityFrameworkCore.Specification</RootNamespace>
+
+        <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+        <Title>Specification pattern implemetation helper package</Title>
+        <Authors>Abir Mahmud</Authors>
+        <Description>Proper documentation is coming soon...
+        </Description>
+        <RepositoryUrl>https://github.com/softoverse/Softoverse.EntityFrameworkCore.Specification</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageTags>.NET 9.0</PackageTags>
+        <PackAsTool>False</PackAsTool>
+        <IncludeSymbols>True</IncludeSymbols>
+        <SymbolPackageFormat>symbols.nupkg</SymbolPackageFormat>
+        <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+        
+        <Version>2.0.0</Version>
     </PropertyGroup>
 
     <PropertyGroup>

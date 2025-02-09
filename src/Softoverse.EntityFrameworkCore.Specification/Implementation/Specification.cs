@@ -2,10 +2,10 @@
 
 using Microsoft.EntityFrameworkCore.Query;
 
-using Softoverse.Specification.Abstraction;
-using Softoverse.Specification.Helpers;
+using Softoverse.EntityFrameworkCore.Specification.Abstraction;
+using Softoverse.EntityFrameworkCore.Specification.Helpers;
 
-namespace Softoverse.Specification.Implementation;
+namespace Softoverse.EntityFrameworkCore.Specification.Implementation;
 
 public class Specification<TEntity> : ISpecification<TEntity> where TEntity : class
 {
@@ -35,15 +35,16 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
     public bool AsSplitQuery { get; protected set; }
     public bool AsNoTracking { get; protected set; }
 
-    public List<Expression<Func<TEntity, object>>> IncludeExpressions { get; } = new();
-    public List<string> IncludeStrings { get; } = new();
+    public List<Expression<Func<TEntity, object>>> IncludeExpressions { get; } = [];
+    public List<string> IncludeStrings { get; } = [];
 
     public Expression<Func<TEntity, object>>? OrderByExpression { get; set; }
     public Expression<Func<TEntity, object>>? OrderByDescendingExpression { get; set; }
 
     public Expression<Func<TEntity, object>>? ProjectionExpression { get; set; }
 
-    public Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> ExecuteUpdateExpression { get; set; }
+    public Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>>? ExecuteUpdateExpression { get; set; }
+    public List<Expression<Func<TEntity, object>>> ExecuteUpdateProperties { get; set; } = [];
 
     public void AddInclude(Expression<Func<TEntity, object>> includeExpression) => IncludeExpressions.Add(includeExpression);
 
@@ -54,7 +55,10 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
     public void AddOrderByDescending(Expression<Func<TEntity, object>> orderByDescendingExpression) => OrderByDescendingExpression = orderByDescendingExpression;
 
     public void SetProjection(Expression<Func<TEntity, object>> projectionExpression) => ProjectionExpression = projectionExpression;
+
     public void SetExecuteUpdateExpression(Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> executeUpdateExpression) => ExecuteUpdateExpression = executeUpdateExpression;
+
+    public void AddExecuteUpdateProperties(Expression<Func<TEntity, object>> propertySelector) => ExecuteUpdateProperties.Add(propertySelector);
 
     public static Expression<Func<TEntity, bool>> ToConditionalExpression<TProperty>(Expression<Func<TEntity, TProperty>> propertySelector, string value, Expression<Func<TEntity, bool>>? defaultExpression)
     {

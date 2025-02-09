@@ -1,11 +1,8 @@
-﻿
+﻿using Microsoft.EntityFrameworkCore;
 
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Query.SqlExpressions;
+using Softoverse.EntityFrameworkCore.Specification.Abstraction;
 
-using Softoverse.Specification.Abstraction;
-
-namespace Softoverse.Specification.Implementation;
+namespace Softoverse.EntityFrameworkCore.Specification.Implementation;
 
 public static class SpecificationEvaluator
 {

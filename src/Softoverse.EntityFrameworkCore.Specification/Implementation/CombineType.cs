@@ -1,4 +1,4 @@
-﻿namespace Softoverse.Specification.Implementation
+﻿namespace Softoverse.EntityFrameworkCore.Specification.Implementation
 {
     public enum CombineType
     {
