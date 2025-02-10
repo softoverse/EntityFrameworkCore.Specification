@@ -1,4 +1,5 @@
 ﻿using System.Linq.Expressions;
+using System.Numerics;
 
 using Microsoft.EntityFrameworkCore.Query;
 
@@ -327,4 +328,92 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
             }
         }
     }
+
+
+    public static Expression<Func<TEntity, bool>> ToConditionalExpression<TProperty>(Expression<Func<TEntity, TProperty>> propertySelector,
+                                                                                     TProperty value,
+                                                                                     Expression<Func<TEntity, bool>> defaultExpression)
+    {
+        return ToConditionalExpressionInternal(propertySelector, value!, default!, defaultExpression);
+    }
+
+    public static Expression<Func<TEntity, bool>> ToConditionalExpression<TProperty>(Expression<Func<TEntity, TProperty>> propertySelector,
+                                                                                     TProperty value)
+        where TProperty : class
+    {
+        return ToConditionalExpressionInternal(propertySelector, value, default);
+    }
+
+    #region bool
+
+    public static Expression<Func<TEntity, bool>> ToConditionalExpression<TProperty>(Expression<Func<TEntity, TProperty>> propertySelector,
+                                                                                     bool value,
+                                                                                     EqualOperation defaultOperation)
+        where TProperty : struct, IComparable<bool>
+    {
+        var newOperation = defaultOperation switch
+        {
+            EqualOperation.Equal => Operation.Equal,
+            EqualOperation.NotEqual => Operation.NotEqual,
+            _ => throw new ArgumentException("Invalid operation")
+        };
+
+        return ToConditionalExpressionInternal(propertySelector, value, newOperation);
+    }
+
+    #endregion bool
+
+    #region Other Generic
+
+    // public static Expression<Func<TEntity, bool>> ToConditionalExpression<TProperty>(Expression<Func<TEntity, TProperty>> propertySelector,
+    //                                                                                  TProperty value,
+    //                                                                                  EqualOperation operation)
+    //     where TProperty : class
+    // {
+    //     var newOperation = operation switch
+    //     {
+    //         EqualOperation.Equal => Operation.Equal,
+    //         EqualOperation.NotEqual => Operation.NotEqual,
+    //         _ => throw new ArgumentException("Invalid operation")
+    //     };
+    //     return ToConditionalExpressionInternal(propertySelector, value, newOperation);
+    // }
+
+    public static Expression<Func<TEntity, bool>> ToConditionalExpression<TProperty>(Expression<Func<TEntity, TProperty>> propertySelector,
+                                                                                     string value,
+                                                                                     EqualOperation defaultOperation)
+    {
+        var newOperation = defaultOperation switch
+        {
+            EqualOperation.Equal => Operation.Equal,
+            EqualOperation.NotEqual => Operation.NotEqual,
+            _ => throw new ArgumentException("Invalid operation")
+        };
+
+        return ToConditionalExpressionInternal(propertySelector, value, newOperation);
+    }
+
+    #endregion Other Generic
+
+    #region numeric
+
+    public static Expression<Func<TEntity, bool>> ToConditionalExpression<TProperty>(Expression<Func<TEntity, TProperty>> propertySelector,
+                                                                                     TProperty value,
+                                                                                     CompareOperation defaultOperation)
+        where TProperty : struct, IComparable<TProperty>, INumber<TProperty>
+    {
+        var newOperation = defaultOperation switch
+        {
+            CompareOperation.Equal => Operation.Equal,
+            CompareOperation.NotEqual => Operation.NotEqual,
+            CompareOperation.GreaterThan => Operation.GreaterThan,
+            CompareOperation.GreaterThanOrEqual => Operation.GreaterThanOrEqual,
+            CompareOperation.LessThan => Operation.LessThan,
+            CompareOperation.LessThanOrEqual => Operation.LessThanOrEqual,
+            _ => throw new ArgumentException("Invalid operation")
+        };
+        return ToConditionalExpressionInternal(propertySelector, value, newOperation);
+    }
+
+    #endregion numeric
 }

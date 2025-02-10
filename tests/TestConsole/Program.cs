@@ -9,21 +9,22 @@ Console.WriteLine("Hello, World!");
 
 Specification<Country> specification = new Specification<Country>();
 
-var expression1 = specification.ToConditionalExpression(x => x.Name, "BD");
+var expression1 = Specification<Country>.ToConditionalExpression(x => x.Name, "BD");
 
-var expression2 = specification.ToConditionalExpression(x => x.Name, "BD", x => x.Name == "BD");
+var expression2 = Specification<Country>.ToConditionalExpression(x => x.Name, "BD", x => x.Name == "BD");
 
-var expression3 = specification.ToConditionalExpression(x => x.Name, "BD", EqualOperation.Equal);
+var expression3 = Specification<Country>.ToConditionalExpression(x => x.Name, "BD", EqualOperation.Equal);
 
-var expression4 = specification.ToConditionalExpression(x => x.IsIndependent, false, EqualOperation.Equal);
+var expression4 = Specification<Country>.ToConditionalExpression(x => x.IsIndependent, false, EqualOperation.Equal);
 
-var expression5 = specification.ToConditionalExpression(x => x.Population, 0, CompareOperation.GreaterThan);
+var expression5 = Specification<Country>.ToConditionalExpression(x => x.Population, 0, CompareOperation.GreaterThan);
 
-var expression6 = specification.ToConditionalExpression(x => x.IsIndependent, false, x => x.IsIndependent == false);
+var expression6 = Specification<Country>.ToConditionalExpression(x => x.IsIndependent, false, x => x.IsIndependent == false);
 
-var expression7 = specification.ToConditionalExpression(x => x.IsIndependent, "eqqwe:True", EqualOperation.NotEqual);
+var expression7 = Specification<Country>.ToConditionalExpression(x => x.IsIndependent, "eqqwe:True", EqualOperation.NotEqual);
+var expression71 = Specification<Country>.ToConditionalExpression(x => x.IsIndependent, "eqci:True", EqualOperation.NotEqual);
 
-var expression8 = specification.ToConditionalExpression(x => x.IsIndependent, "eq:true", EqualOperation.NotEqual);
+var expression8 = Specification<Country>.ToConditionalExpression(x => x.IsIndependent, "eq:true", EqualOperation.NotEqual);
 
 Console.WriteLine(expression1);
 Console.WriteLine(expression2);
