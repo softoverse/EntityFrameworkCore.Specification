@@ -3,6 +3,7 @@
 using Microsoft.EntityFrameworkCore.Query;
 
 using Softoverse.EntityFrameworkCore.Specification.Abstraction;
+using Softoverse.EntityFrameworkCore.Specification.Extensions;
 using Softoverse.EntityFrameworkCore.Specification.Helpers;
 
 namespace Softoverse.EntityFrameworkCore.Specification.Implementation;
@@ -62,12 +63,20 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
 
     public void AddExecuteUpdateProperties(Expression<Func<TEntity, object>> propertySelector) => ExecuteUpdateProperties.Add(propertySelector);
 
-    public static Expression<Func<TEntity, bool>> ToConditionalExpression<TProperty>(Expression<Func<TEntity, TProperty>> propertySelector, string value, Expression<Func<TEntity, bool>>? defaultExpression)
+    internal static Expression<Func<TEntity, bool>> ToConditionalExpressionInternal<TProperty>(Expression<Func<TEntity, TProperty>> propertySelector,
+                                                                                               object value,
+                                                                                               Operation defaultOperation,
+                                                                                               Expression<Func<TEntity, bool>>? defaultExpression = null)
     {
+        var targetType = typeof(TProperty);
+        var underlyingType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+
         // If not a query string, return the default query
-        if (!IsQueryString(value))
+        if (!IsQueryString(value.ToString()))
         {
-            return defaultExpression ?? throw new ArgumentException($"'defaultExpression' was not being provided for the given value: {value} and also did not contain a query sting");
+            return defaultExpression
+                ?? CreateExpression(propertySelector, (TProperty)ConvertToType(value, underlyingType), defaultOperation)
+                ?? throw new ArgumentException($"'defaultExpression' was not being provided for the given value: {value} and also did not contain a query sting");
         }
 
         const string lessThan = "lt";
@@ -96,14 +105,11 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
 
         const char splitBy = ',';
 
-        var splitValues = value.Split(':');
+        var splitValues = value?.ToString()?.Split(':') ?? [];
         var condition = splitValues[0].ToLower();
 
         var parameter = propertySelector.Parameters[0];
         var property = propertySelector.Body;
-
-        var targetType = typeof(TProperty);
-        var underlyingType = Nullable.GetUnderlyingType(targetType) ?? targetType;
 
         // Handle basic comparisons: 'lt', 'lte', 'gt', 'gte', 'eq', 'ne', 'eqci', 'like', 'likeci', 'range, 'in', 'nin', 'inci', 'ninci', 'inlike', 'ninlike', 'inlikeci', 'ninlikeci'
         return condition switch
@@ -184,13 +190,50 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
                                                        BuildInExpression(property, splitValues[1].Split(splitBy), underlyingType, isNotIn: true, isLike: true, caseInsensitive: true),
                                                        parameter),
 
-            _ => defaultExpression ?? throw new ArgumentException($"'defaultExpression' was not being provided for the given value: {value}")
+            _ => defaultExpression
+              ?? CreateExpression(propertySelector, (TProperty)ConvertToType(value, underlyingType), defaultOperation)
+              ?? throw new ArgumentException($"'defaultExpression' was not being provided for the given value: {value}")
         };
 
         // Local function to determine if the value is a query string
         static bool IsQueryString(string? value)
         {
             return !string.IsNullOrEmpty(value) && !string.IsNullOrWhiteSpace(value) && value.Contains(":");
+        }
+
+        static Expression<Func<TEntity, bool>> CreateExpression(Expression<Func<TEntity, TProperty>> propertySelector,
+                                                                TProperty value,
+                                                                Operation expressionType)
+        {
+            // Get the parameter expression (e.g., 'e' in 'e => e.Name')
+            var parameter = propertySelector.Parameters[0];
+
+            // Get the member expression (e.g., 'e.Name' in 'e => e.Name')
+            if (propertySelector.Body is not MemberExpression memberExpression)
+            {
+                throw new ArgumentException("The propertySelector must be a simple member access expression.");
+            }
+
+            // Create constant expression for value
+            var constantValue = Expression.Constant(value, typeof(TProperty));
+
+            // Create equality expression (e.g., 'e.Name == value')
+            Expression expression = expressionType switch
+            {
+                Operation.Equal => Expression.Equal(memberExpression, constantValue),
+                Operation.NotEqual => Expression.NotEqual(memberExpression, constantValue),
+                Operation.GreaterThan => Expression.GreaterThan(memberExpression, constantValue),
+                Operation.GreaterThanOrEqual => Expression.GreaterThanOrEqual(memberExpression, constantValue),
+                Operation.LessThan => Expression.LessThan(memberExpression, constantValue),
+                Operation.LessThanOrEqual => Expression.LessThanOrEqual(memberExpression, constantValue),
+                _ => throw new ArgumentOutOfRangeException()
+            };
+
+            // // Create equality expression (e.g., 'e.Name == value')
+            // var expression = binaryExpressionFunc(memberExpression, constantValue); // Expression.Equal(member, constant);
+
+            // Create the final lambda expression (e.g., 'e => e.Name == value')
+            return Expression.Lambda<Func<TEntity, bool>>(expression, parameter);
         }
 
         // Local function to build comparison expressions
@@ -211,14 +254,31 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
         }
 
         // Local function to convert a string to the appropriate target type
-        static object ConvertToType(string input, Type targetType)
+        static object ConvertToType(object input, Type targetType)
         {
             if (targetType != typeof(DateTime) && targetType != typeof(DateTimeOffset))
             {
-                return Convert.ChangeType(input, targetType);
+                try
+                {
+                    return Convert.ChangeType(input, targetType);
+                }
+                catch (Exception)
+                {
+                    if (targetType != typeof(string))
+                    {
+                        input = input.ToString()?.Split(':').LastOrDefault()!;
+                    }
+
+                    if (input is not null)
+                    {
+                        return Convert.ChangeType(input, targetType);
+                    }
+
+                    return null;
+                }
             }
 
-            if (DateTime.TryParse(input, out DateTime dateTimeValue))
+            if (DateTime.TryParse(input.ToString(), out DateTime dateTimeValue))
             {
                 return dateTimeValue;
             }
@@ -267,5 +327,4 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
             }
         }
     }
-
 }
