@@ -14,7 +14,7 @@ public static class DictionaryHelper
 
             object value = kvp.Value;
 
-            // 🔹 Convert JsonElement to object if needed
+            // Convert JsonElement to object if needed
             if (value is JsonElement jsonElement)
             {
                 value = ConvertJsonElement(jsonElement);
