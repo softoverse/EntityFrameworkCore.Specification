@@ -8,9 +8,9 @@ namespace Softoverse.EntityFrameworkCore.Specification.Helpers;
 
 public static class ExpressionGenerator<TEntity>
 {
-    private static readonly ConcurrentDictionary<Type, Func<TEntity, object>> PropertyCompiledSelectors = new ConcurrentDictionary<Type, Func<TEntity, object>>();
+    private static readonly ConcurrentDictionary<Expression, Func<TEntity, object>> PropertyCompiledSelectors = new ConcurrentDictionary<Expression, Func<TEntity, object>>();
     private static readonly ConcurrentDictionary<string, LambdaExpression> PropertySelectorCache = new ConcurrentDictionary<string, LambdaExpression>();
-    
+
     static readonly MethodInfo SetPropertyMethodInfo;
 
     static ExpressionGenerator()
@@ -20,24 +20,21 @@ public static class ExpressionGenerator<TEntity>
                                 .First(m => m.Name == nameof(SetPropertyCalls<TEntity>.SetProperty) && !m.GetParameters()[1].ParameterType.IsGenericType);
     }
 
-    public static Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> BuildUpdateExpression(
-        ICollection<Expression<Func<TEntity, object>>> properties,
-        TEntity model)
+    public static Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> BuildUpdateExpression(ICollection<Expression<Func<TEntity, object>>> properties,
+                                                                                                               TEntity model)
     {
         var parameter = Expression.Parameter(typeof(SetPropertyCalls<TEntity>), "c");
         Expression body = parameter;
 
         foreach (var propertySelector in properties)
         {
-            var compiledSelector = PropertyCompiledSelectors.GetOrAdd(
-                                                                      propertySelector.Body.Type,
-                                                                      _ => propertySelector.Compile());
-            
+            var compiledSelector = PropertyCompiledSelectors.GetOrAdd(propertySelector.Body, _ => propertySelector.Compile());
+
             object value = compiledSelector(model);
             Type propertyType = value.GetType();
 
             var method = SetPropertyMethodInfo.MakeGenericMethod(propertyType);
-            
+
             var propertyExpression = propertySelector.Body.Type == propertyType
                 ? propertySelector.Body
                 : Expression.Convert(propertySelector.Body, propertyType);
@@ -50,8 +47,7 @@ public static class ExpressionGenerator<TEntity>
         return Expression.Lambda<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>>(body, parameter);
     }
 
-    public static Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> BuildUpdateExpression(
-        Dictionary<string, object> propertyUpdates)
+    public static Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> BuildUpdateExpression(IDictionary<string, object> propertyUpdates)
     {
         var parameter = Expression.Parameter(typeof(SetPropertyCalls<TEntity>), "c");
         Expression body = parameter;
@@ -62,7 +58,7 @@ public static class ExpressionGenerator<TEntity>
             var value = update.Value;
 
             // Retrieve or create cached property selector
-            var propertySelector = (LambdaExpression)PropertySelectorCache.GetOrAdd(propertyPath, key =>
+            var propertySelector = PropertySelectorCache.GetOrAdd(propertyPath, key =>
             {
                 var entityParameter = Expression.Parameter(typeof(TEntity), "e");
                 Expression propertyAccess = entityParameter;
@@ -76,9 +72,27 @@ public static class ExpressionGenerator<TEntity>
             });
 
             Type propertyType = propertySelector.Body.Type;
-            var convertedValue = Convert.ChangeType(value, propertyType);
+
+            // Handle Nullable Types
+            if (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Nullable<>))
+            {
+                propertyType = Nullable.GetUnderlyingType(propertyType);
+            }
+
+            object convertedValue;
+            try
+            {
+                // Ensure value is convertible
+                convertedValue = value == null ? null : Convert.ChangeType(value, propertyType);
+            }
+            catch (InvalidCastException)
+            {
+                // If Convert.ChangeType fails, try direct assignment if compatible
+                convertedValue = value;
+            }
+
             var method = SetPropertyMethodInfo.MakeGenericMethod(propertyType);
-            
+
             body = Expression.Call(body, method, propertySelector, Expression.Constant(convertedValue, propertyType));
         }
 

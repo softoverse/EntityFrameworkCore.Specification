@@ -40,8 +40,8 @@ var expression8 = Specification<Country>.ToConditionalExpression(x => x.IsIndepe
 // Console.WriteLine(expression8);
 
 
-var sw2 = Stopwatch.StartNew();
-Specification<City> citySpecification2 = new Specification<City>
+var sw1 = Stopwatch.StartNew();
+Specification<City> citySpecification1 = new Specification<City>
 {
     ExecuteUpdateExpression = ExpressionGenerator<City>.BuildUpdateExpression([
                                                                                   e => e.Name,
@@ -58,23 +58,24 @@ Specification<City> citySpecification2 = new Specification<City>
                                                                                   }
                                                                               })
 };
-sw2.Stop();
-
-
-var sw1 = Stopwatch.StartNew();
-Specification<City> citySpecification1 = new Specification<City>
-{
-    ExecuteUpdateExpression = ExpressionGenerator<City>.BuildUpdateExpression(new Dictionary<string, object>
-    {
-        ["Name"] = "New Name",
-        ["IsCapital"] = "true",
-        ["Country.Name"] = "USA"
-    })
-};
 sw1.Stop();
+
+
+var sw2 = Stopwatch.StartNew();
+IDictionary<string, object> model = new Dictionary<string, object>
+{
+    ["Name"] = "New Name",
+    ["IsCapital"] = "true",
+    ["Country.Name"] = "USA"
+};
+Specification<City> citySpecification2 = new Specification<City>
+{
+    ExecuteUpdateExpression = ExpressionGenerator<City>.BuildUpdateExpression(model)
+};
+sw2.Stop();
 
 
 Console.WriteLine(sw1);
 Console.WriteLine(citySpecification1.ExecuteUpdateExpression);
-Console.WriteLine(citySpecification2.ExecuteUpdateExpression);
 Console.WriteLine(sw2);
+Console.WriteLine(citySpecification2.ExecuteUpdateExpression);
