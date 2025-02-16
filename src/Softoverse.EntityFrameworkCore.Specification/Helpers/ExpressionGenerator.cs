@@ -10,10 +10,10 @@ namespace Softoverse.EntityFrameworkCore.Specification.Helpers;
 public static class ExpressionGenerator<TEntity>
 {
     private static readonly ConcurrentDictionary<Expression, Func<TEntity, object>> PropertyCompiledSelectors = new ConcurrentDictionary<Expression, Func<TEntity, object>>();
-    private static readonly ConcurrentDictionary<string, LambdaExpression> PropertySelectorCache = new ConcurrentDictionary<string, LambdaExpression>();
 
+
+    // ReSharper disable once StaticMemberInGenericType
     static readonly MethodInfo SetPropertyMethodInfo;
-
     static ExpressionGenerator()
     {
         SetPropertyMethodInfo = typeof(SetPropertyCalls<TEntity>)
@@ -102,7 +102,41 @@ public static class ExpressionGenerator<TEntity>
         return Expression.Lambda<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>>(body, parameter);
     }
 
-    private static object ConvertJsonElement(JsonElement jsonElement)
+    public static IDictionary<string, object> FlattenDictionary(IDictionary<string, object> dictionary, string parentKey = "")
+    {
+        var flattened = new Dictionary<string, object>();
+
+        foreach (var kvp in dictionary)
+        {
+            string key = string.IsNullOrEmpty(parentKey) ? kvp.Key : $"{parentKey}.{kvp.Key}";
+
+            object value = kvp.Value;
+
+            // 🔹 Convert JsonElement to object if needed
+            if (value is JsonElement jsonElement)
+            {
+                value = ConvertJsonElement(jsonElement);
+            }
+
+            if (value is IDictionary<string, object> nestedDict)
+            {
+                // Recursively process nested dictionaries
+                foreach (var nestedKvp in FlattenDictionary(nestedDict, key))
+                {
+                    flattened[nestedKvp.Key] = nestedKvp.Value;
+                }
+            }
+            else
+            {
+                // Add normal key-value pairs
+                flattened[key] = value;
+            }
+        }
+
+        return flattened;
+    }
+
+    public static object ConvertJsonElement(JsonElement jsonElement)
     {
         object? value;
         switch (jsonElement.ValueKind)
