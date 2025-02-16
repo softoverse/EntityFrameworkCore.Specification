@@ -1,6 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
-
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Linq.Expressions;
 
 using Softoverse.EntityFrameworkCore.Specification.Extensions;
@@ -8,8 +6,6 @@ using Softoverse.EntityFrameworkCore.Specification.Helpers;
 using Softoverse.EntityFrameworkCore.Specification.Implementation;
 
 using TestConsole;
-
-Console.WriteLine("Hello, World!");
 
 Specification<Country> specification = new Specification<Country>();
 
@@ -26,37 +22,41 @@ var expression5 = Specification<Country>.ToConditionalExpression(x => x.Populati
 var expression6 = Specification<Country>.ToConditionalExpression(x => x.IsIndependent, false, x => x.IsIndependent == false);
 
 var expression7 = Specification<Country>.ToConditionalExpression(x => x.IsIndependent, "eqqwe:True", EqualOperation.NotEqual);
-var expression71 = Specification<Country>.ToConditionalExpression(x => x.IsIndependent, "eqci:True", EqualOperation.NotEqual);
+var expression8 = Specification<Country>.ToConditionalExpression(x => x.IsIndependent, "eqci:True", EqualOperation.NotEqual);
 
-var expression8 = Specification<Country>.ToConditionalExpression(x => x.IsIndependent, "eq:true", EqualOperation.NotEqual);
+var expression9 = Specification<Country>.ToConditionalExpression(x => x.IsIndependent, "eq:true", EqualOperation.NotEqual);
 
-// Console.WriteLine(expression1);
-// Console.WriteLine(expression2);
-// Console.WriteLine(expression3);
-// Console.WriteLine(expression4);
-// Console.WriteLine(expression5);
-// Console.WriteLine(expression6);
-// Console.WriteLine(expression7);
-// Console.WriteLine(expression8);
+Console.WriteLine(expression1);
+Console.WriteLine(expression2);
+Console.WriteLine(expression3);
+Console.WriteLine(expression4);
+Console.WriteLine(expression5);
+Console.WriteLine(expression6);
+Console.WriteLine(expression7);
+Console.WriteLine(expression8);
+Console.WriteLine(expression9);
 
+Console.WriteLine();
 
 var sw1 = Stopwatch.StartNew();
+ICollection<Expression<Func<City, object>>> properties =
+[
+    e => e.Name,
+    e => e.IsCapital,
+    e => e.Country.Name
+];
+var city = new City
+{
+    Name = "New Name",
+    IsCapital = true,
+    Country = new Country
+    {
+        Name = "USA"
+    }
+};
 Specification<City> citySpecification1 = new Specification<City>
 {
-    ExecuteUpdateExpression = ExpressionGenerator<City>.BuildUpdateExpression([
-                                                                                  e => e.Name,
-                                                                                  e => e.IsCapital,
-                                                                                  e => e.Country.Name
-                                                                              ],
-                                                                              new City
-                                                                              {
-                                                                                  Name = "New Name",
-                                                                                  IsCapital = true,
-                                                                                  Country = new Country
-                                                                                  {
-                                                                                      Name = "USA"
-                                                                                  }
-                                                                              })
+    ExecuteUpdateExpression = ExpressionGenerator<City>.BuildUpdateExpression(properties, city)
 };
 sw1.Stop();
 
