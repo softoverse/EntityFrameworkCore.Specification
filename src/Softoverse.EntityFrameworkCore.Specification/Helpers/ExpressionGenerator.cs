@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore.Query;
 
@@ -51,51 +52,113 @@ public static class ExpressionGenerator<TEntity>
     {
         var parameter = Expression.Parameter(typeof(SetPropertyCalls<TEntity>), "c");
         Expression body = parameter;
+        var entityParameter = Expression.Parameter(typeof(TEntity), "e");
+        var properties = new Dictionary<Expression<Func<TEntity, object>>, object>();
 
-        foreach (var update in propertyUpdates)
+        foreach (var kvp in propertyUpdates)
         {
-            var propertyPath = update.Key;
-            var value = update.Value;
+            string propertyPath = kvp.Key;
+            Expression propertyExpression = entityParameter;
 
-            // Retrieve or create cached property selector
-            var propertySelector = PropertySelectorCache.GetOrAdd(propertyPath, key =>
+            foreach (var propertyName in propertyPath.Split('.'))
             {
-                var entityParameter = Expression.Parameter(typeof(TEntity), "e");
-                Expression propertyAccess = entityParameter;
-
-                foreach (var property in key.Split('.'))
-                {
-                    propertyAccess = Expression.PropertyOrField(propertyAccess, property);
-                }
-
-                return Expression.Lambda(propertyAccess, entityParameter);
-            });
-
-            Type propertyType = propertySelector.Body.Type;
-
-            // Handle Nullable Types
-            if (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Nullable<>))
-            {
-                propertyType = Nullable.GetUnderlyingType(propertyType);
+                propertyExpression = Expression.Property(propertyExpression, propertyName);
             }
 
-            object convertedValue;
-            try
+            var lambda = Expression.Lambda<Func<TEntity, object>>(Expression.Convert(propertyExpression, typeof(object)), entityParameter);
+            object value = kvp.Value;
+            if (value is JsonElement jsonElement)
             {
-                // Ensure value is convertible
-                convertedValue = value == null ? null : Convert.ChangeType(value, propertyType);
+                value = ConvertJsonElement(jsonElement);
             }
-            catch (InvalidCastException)
-            {
-                // If Convert.ChangeType fails, try direct assignment if compatible
-                convertedValue = value;
-            }
+            properties[lambda] = value;
+        }
+
+        foreach (var kvp in properties)
+        {
+            var propertySelector = kvp.Key;
+            var value = kvp.Value;
+            Type propertyType = value.GetType();
 
             var method = SetPropertyMethodInfo.MakeGenericMethod(propertyType);
 
-            body = Expression.Call(body, method, propertySelector, Expression.Constant(convertedValue, propertyType));
+            Expression propertyExpression = propertySelector.Body;
+            if (propertyExpression.Type != propertyType)
+            {
+                propertyExpression = Expression.Convert(propertyExpression, propertyType);
+            }
+
+            var convertedPropertySelector = Expression.Lambda(propertyExpression, propertySelector.Parameters);
+
+            Expression valueExpression = Expression.Constant(value, propertyType);
+            if (propertyType.IsValueType)
+            {
+                valueExpression = Expression.Convert(valueExpression, propertyType);
+            }
+
+            body = Expression.Call(body, method, convertedPropertySelector, valueExpression);
         }
 
         return Expression.Lambda<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>>(body, parameter);
+    }
+
+    private static object ConvertJsonElement(JsonElement jsonElement)
+    {
+        object? value;
+        switch (jsonElement.ValueKind)
+        {
+            case JsonValueKind.String:
+                {
+                    var str = jsonElement.GetString();
+                    value = str is
+                    {
+                        Length: 1
+                    } ? str[0] : str;
+                    break;
+                }
+            case JsonValueKind.Number:
+                value = jsonElement.TryGetInt64(out long longValue)
+                    ? longValue
+                    : jsonElement.TryGetDouble(out double doubleValue)
+                        ? doubleValue
+                        : jsonElement.TryGetDecimal(out decimal decimalValue)
+                            ? decimalValue
+                            : jsonElement.TryGetSingle(out float floatValue)
+                                ? floatValue
+                                : jsonElement.TryGetByte(out byte byteValue)
+                                    ? byteValue
+                                    : jsonElement.TryGetSByte(out sbyte sbyteValue)
+                                        ? sbyteValue
+                                        : jsonElement.TryGetUInt16(out ushort ushortValue)
+                                            ? ushortValue
+                                            : jsonElement.TryGetInt16(out short shortValue)
+                                                ? shortValue
+                                                : jsonElement.TryGetUInt32(out uint uintValue)
+                                                    ? uintValue
+                                                    : jsonElement.TryGetInt32(out int intValue)
+                                                        ? intValue
+                                                        : jsonElement.GetDouble();
+                break;
+            case JsonValueKind.True:
+                value = true;
+                break;
+            case JsonValueKind.False:
+                value = false;
+                break;
+            case JsonValueKind.Null or JsonValueKind.Undefined:
+                value = null;
+                break;
+            case JsonValueKind.Array:
+                value = jsonElement.EnumerateArray().Select(ConvertJsonElement).ToArray();
+                break;
+            case JsonValueKind.Object:
+                value = jsonElement.EnumerateObject().ToDictionary(x => x.Name, x => ConvertJsonElement(x.Value));
+                break;
+            default:
+                value = jsonElement.ToString();
+                break;
+        }
+
+        return value!;
     }
 }

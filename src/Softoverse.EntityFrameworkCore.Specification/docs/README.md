@@ -20,7 +20,7 @@ dotnet add package Softoverse.EntityFrameworkCore.Specification
 If you prefer to add the dependency manually, update your `.csproj` file:
 ```xml
 <ItemGroup>
-    <PackageReference Include="Softoverse.EntityFrameworkCore.Specification" Version="2.3.2" />
+    <PackageReference Include="Softoverse.EntityFrameworkCore.Specification" Version="2.4.0" />
 </ItemGroup>
 ```
 
