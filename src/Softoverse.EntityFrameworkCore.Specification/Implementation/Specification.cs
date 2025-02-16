@@ -4,7 +4,6 @@ using System.Numerics;
 using Microsoft.EntityFrameworkCore.Query;
 
 using Softoverse.EntityFrameworkCore.Specification.Abstraction;
-using Softoverse.EntityFrameworkCore.Specification.Extensions;
 using Softoverse.EntityFrameworkCore.Specification.Helpers;
 
 namespace Softoverse.EntityFrameworkCore.Specification.Implementation;
