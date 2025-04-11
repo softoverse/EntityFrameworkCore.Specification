@@ -32,6 +32,8 @@ public static class SpecificationEvaluator
         // Handle primary key search
         if (specification.PrimaryKey is not null)
         {
+            // TODO: Add support for multiple primary keys
+            // TODO: Remove support for includes for FindAsync method
             inputQueryable = specification.IncludeExpressions.Aggregate(inputQueryable, (current, includeExpression) => current.Include(includeExpression) as DbSet<TEntity>);
             inputQueryable = specification.IncludeStrings.Aggregate(inputQueryable, (current, include) => (DbSet<TEntity>)current.Include(include));
 
