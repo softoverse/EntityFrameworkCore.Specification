@@ -79,3 +79,65 @@ Console.WriteLine(sw1);
 Console.WriteLine(citySpecification1.ExecuteUpdateExpression);
 Console.WriteLine(sw2);
 Console.WriteLine(citySpecification2.ExecuteUpdateExpression);
+
+List<Country> countries = new List<Country>
+{
+    new Country()
+    {
+        Name = "USA",
+        Cities = new List<City>()
+        {
+            new City()
+            {
+                Name = "New York"
+            },
+            new City()
+            {
+                Name = "San Francisco"
+            }
+        },
+        IsIndependent = true
+    },
+    new Country()
+    {
+        Name = "Russia",
+        Cities = new List<City>()
+        {
+            new City()
+            {
+                Name = "Moscow"
+            },
+            new City()
+            {
+                Name = "Saint Petersburg"
+            }
+        },
+        IsIndependent = true
+    },
+    new Country()
+    {
+        Name = "Germany",
+        Cities = new List<City>()
+        {
+            new City()
+            {
+                Name = "Berlin"
+            },
+            new City()
+            {
+                Name = "Munich"
+            }
+        },
+        IsIndependent = true
+    }
+};
+
+Specification<Country> countrySpecification = new Specification<Country>([
+    x => x.IsIndependent,
+    x => x.Cities.Any(y => y.Name == "Berlin" || y.Name == "Moscow"),
+    x => x.Cities.Any(y => y.Name == "Moscow"),
+], CombineType.And);
+Console.WriteLine(countrySpecification.Criteria);
+
+var result = countries.Where(countrySpecification.Criteria?.Compile() ?? (x => true));
+Console.WriteLine(string.Join(", ", result.Select(x => x.Name)));

@@ -11,8 +11,8 @@ internal static class ExpressionCombiner
 
         var parameter = Expression.Parameter(typeof(TEntity));
 
-        var left = ParameterRebinder.ReplaceParameters(parameter, expression1.Body);
-        var right = ParameterRebinder.ReplaceParameters(parameter, expression2.Body);
+        var left = ParameterRebinder.ReplaceParameters(parameter, expression1.Parameters[0], expression1.Body);
+        var right = ParameterRebinder.ReplaceParameters(parameter, expression2.Parameters[0], expression2.Body);
 
         var body = Expression.AndAlso(left, right);
         return Expression.Lambda<Func<TEntity, bool>>(body, parameter);
@@ -30,8 +30,8 @@ internal static class ExpressionCombiner
 
         var parameter = Expression.Parameter(typeof(TEntity));
 
-        var left = ParameterRebinder.ReplaceParameters(parameter, expression1.Body);
-        var right = ParameterRebinder.ReplaceParameters(parameter, expression2.Body);
+        var left = ParameterRebinder.ReplaceParameters(parameter, expression1.Parameters[0], expression1.Body);
+        var right = ParameterRebinder.ReplaceParameters(parameter, expression2.Parameters[0], expression2.Body);
 
         var body = Expression.OrElse(left, right);
         return Expression.Lambda<Func<TEntity, bool>>(body, parameter);
@@ -49,7 +49,7 @@ internal static class ExpressionCombiner
 
         var parameter = Expression.Parameter(typeof(TEntity));
 
-        var body = Expression.Not(ParameterRebinder.ReplaceParameters(parameter, expression.Body));
+        var body = Expression.Not(ParameterRebinder.ReplaceParameters(parameter, expression.Parameters[0], expression.Body));
         return Expression.Lambda<Func<TEntity, bool>>(body, parameter);
 
         //// Less Efficient
@@ -67,10 +67,7 @@ internal static class ExpressionCombiner
             combined = combined == null ? expression : And(combined, expression);
         }
 
-        if (combined == null)
-            return True<TEntity>();
-
-        return combined;
+        return combined ?? True<TEntity>();
     }
 
     public static Expression<Func<TEntity, bool>> CombineWithOr<TEntity>(IEnumerable<Expression<Func<TEntity, bool>>> expressions)
@@ -82,10 +79,7 @@ internal static class ExpressionCombiner
             combined = combined == null ? expression : Or(combined, expression);
         }
 
-        if (combined == null)
-            return True<TEntity>();
-
-        return combined;
+        return combined ?? True<TEntity>();
     }
 
     public static Expression<Func<TEntity, bool>> CombineWithNot<TEntity>(IEnumerable<Expression<Func<TEntity, bool>>> expressions)
@@ -97,10 +91,7 @@ internal static class ExpressionCombiner
             combined = combined == null ? expression : And(combined, Not(expression));
         }
 
-        if (combined == null)
-            return True<TEntity>();
-
-        return combined;
+        return combined ?? True<TEntity>();
     }
 
     public static Expression<Func<TEntity, bool>> True<TEntity>()
@@ -122,8 +113,7 @@ internal static class ExpressionCombiner
     // With Predicates
     public static Expression<Func<TEntity, bool>> ToExpression<TEntity>(Func<TEntity, bool> predicate)
     {
-        if (predicate == null) return True<TEntity>();
-        return x => predicate(x);
+        return predicate == null ? True<TEntity>() : x => predicate(x);
     }
 
     public static Expression<Func<TEntity, bool>> And<TEntity>(Func<TEntity, bool> predicate1, Func<TEntity, bool> predicate2)
@@ -155,10 +145,7 @@ internal static class ExpressionCombiner
             combined = combined == null ? predicate : (x => combined(x) && predicate(x));
         }
 
-        if (combined == null)
-            return True<TEntity>();
-
-        return x => combined(x);
+        return combined == null ? True<TEntity>() : x => combined(x);
     }
 
     public static Expression<Func<TEntity, bool>> CombineWithOr<TEntity>(IEnumerable<Func<TEntity, bool>> predicates)
@@ -170,10 +157,7 @@ internal static class ExpressionCombiner
             combined = combined == null ? predicate : (x => combined(x) || predicate(x));
         }
 
-        if (combined == null)
-            return True<TEntity>();
-
-        return x => combined(x);
+        return combined == null ? True<TEntity>() : x => combined(x);
     }
 
     public static Expression<Func<TEntity, bool>> CombineWithNot<TEntity>(IEnumerable<Func<TEntity, bool>> predicates)
@@ -185,9 +169,6 @@ internal static class ExpressionCombiner
             combined = combined == null ? predicate : (x => combined(x) && !predicate(x));
         }
 
-        if (combined == null)
-            return True<TEntity>();
-
-        return x => combined(x);
+        return combined == null ? True<TEntity>() : x => combined(x);
     }
 }

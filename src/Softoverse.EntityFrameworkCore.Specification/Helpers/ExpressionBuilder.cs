@@ -38,16 +38,16 @@ public static class ExpressionBuilder
 
     public static Expression<Func<T, bool>> CombineWithOr<T>(this IEnumerable<Expression<Func<T, bool>>> expressions)
     {
-        if (expressions == null || expressions.Count() == 0) return ExpressionCombiner.True<T>();
-
-        return ExpressionCombiner.CombineWithOr(expressions);
+        return expressions == null || expressions.Count() == 0
+            ? ExpressionCombiner.True<T>()
+            : ExpressionCombiner.CombineWithOr(expressions);
     }
 
     public static Expression<Func<T, bool>> CombineWithNot<T>(this IEnumerable<Expression<Func<T, bool>>> expressions)
     {
-        if (expressions == null || expressions.Count() == 0) return ExpressionCombiner.True<T>();
-
-        return ExpressionCombiner.CombineWithNot(expressions);
+        return expressions == null || expressions.Count() == 0
+            ? ExpressionCombiner.True<T>()
+            : ExpressionCombiner.CombineWithNot(expressions);
     }
 
     public static Expression<Func<TEntity, bool>> True<TEntity>()
@@ -98,23 +98,23 @@ public static class ExpressionBuilder
 
     public static Expression<Func<T, bool>> CombineWithAnd<T>(this IEnumerable<Func<T, bool>> predicates)
     {
-        if (predicates == null || predicates.Count() == 0) return ExpressionCombiner.True<T>();
-
-        return ExpressionCombiner.CombineWithAnd(predicates);
+        return predicates == null || predicates.Count() == 0
+            ? ExpressionCombiner.True<T>()
+            : ExpressionCombiner.CombineWithAnd(predicates);
     }
 
     public static Expression<Func<T, bool>> CombineWithOr<T>(this IEnumerable<Func<T, bool>> predicates)
     {
-        if (predicates == null || predicates.Count() == 0) return ExpressionCombiner.True<T>();
-
-        return ExpressionCombiner.CombineWithOr(predicates);
+        return predicates == null || predicates.Count() == 0
+            ? ExpressionCombiner.True<T>()
+            : ExpressionCombiner.CombineWithOr(predicates);
     }
 
     public static Expression<Func<T, bool>> CombineWithNot<T>(this IEnumerable<Func<T, bool>> predicates)
     {
-        if (predicates == null || predicates.Count() == 0) return ExpressionCombiner.True<T>();
-
-        return ExpressionCombiner.CombineWithNot(predicates);
+        return predicates == null || predicates.Count() == 0
+            ? ExpressionCombiner.True<T>()
+            : ExpressionCombiner.CombineWithNot(predicates);
     }
 
 }

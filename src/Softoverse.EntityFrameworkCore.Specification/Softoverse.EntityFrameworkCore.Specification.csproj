@@ -19,7 +19,7 @@
         <SymbolPackageFormat>symbols.nupkg</SymbolPackageFormat>
         <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
 
-        <Version>2.4.2</Version>
+        <Version>2.5.0</Version>
 
         <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     </PropertyGroup>
