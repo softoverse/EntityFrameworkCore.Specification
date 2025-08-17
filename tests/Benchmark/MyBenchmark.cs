@@ -245,7 +245,6 @@ public class GetArticlesSpecification : ISpecificationRequest<Article>
     }
 }
 
-
 public class GetArticlesSpecificationWithoutExpressionBuilder : ISpecificationRequest<Article>
 {
     private readonly string _q;
