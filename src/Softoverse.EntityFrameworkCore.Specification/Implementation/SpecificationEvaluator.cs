@@ -6,9 +6,10 @@ namespace Softoverse.EntityFrameworkCore.Specification.Implementation;
 
 public static class SpecificationEvaluator
 {
-    private static async Task<IQueryable<TEntity>> GenerateQuery<TEntity>(DbSet<TEntity> inputQueryable,
-                                                                          ISpecification<TEntity> specification,
-                                                                          CancellationToken ct = default)
+    private static async Task<IQueryable<TEntity>> GenerateQuery<TEntity>(
+        DbSet<TEntity> inputQueryable,
+        ISpecification<TEntity> specification,
+        CancellationToken ct = default)
         where TEntity : class
     {
         // Create the initial queryable
@@ -55,6 +56,11 @@ public static class SpecificationEvaluator
             queryable = queryable.Where(specification.Criteria);
         }
 
+        if (specification.ProjectionExpression is not null)
+        {
+            queryable = queryable.Select(specification.ProjectionExpression).OfType<TEntity>();
+        }
+
         // Apply ordering
         if (specification.OrderByExpression is not null)
         {
@@ -74,11 +80,21 @@ public static class SpecificationEvaluator
         return queryable;
     }
 
+    public static async Task<IQueryable<TEntity>> ApplySpecification<TEntity>(this DbSet<TEntity> query, ISpecification<TEntity> specification, CancellationToken ct = default) where TEntity : class
+    {
+        return await GenerateQuery(query, specification, ct);
+    }
+
+    public static async Task<IQueryable<TEntity>> ApplySpecification<TEntity>(this DbContext dbContext, ISpecification<TEntity> specification, CancellationToken ct = default) where TEntity : class
+    {
+        return await ApplySpecification(dbContext.Set<TEntity>(), specification, ct);
+    }
 
     [Obsolete("", true)]
-    private static async Task<IQueryable<TEntity>> GenerateQueryOld<TEntity>(DbSet<TEntity> inputQueryable,
-                                                                             ISpecification<TEntity> specification,
-                                                                             CancellationToken ct = default)
+    private static async Task<IQueryable<TEntity>> GenerateQueryOld<TEntity>(
+        DbSet<TEntity> inputQueryable,
+        ISpecification<TEntity> specification,
+        CancellationToken ct = default)
         where TEntity : class
     {
         IQueryable<TEntity> queryable = inputQueryable;
@@ -123,16 +139,5 @@ public static class SpecificationEvaluator
         }
 
         return queryable;
-    }
-
-
-    public static async Task<IQueryable<TEntity>> ApplySpecification<TEntity>(this DbSet<TEntity> query, ISpecification<TEntity> specification, CancellationToken ct = default) where TEntity : class
-    {
-        return await GenerateQuery(query, specification, ct);
-    }
-
-    public static async Task<IQueryable<TEntity>> ApplySpecification<TEntity>(this DbContext dbContext, ISpecification<TEntity> specification, CancellationToken ct = default) where TEntity : class
-    {
-        return await ApplySpecification(dbContext.Set<TEntity>(), specification, ct);
     }
 }
