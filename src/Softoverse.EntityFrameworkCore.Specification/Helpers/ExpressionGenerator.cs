@@ -16,15 +16,15 @@ public static class ExpressionGenerator<TEntity>
     static readonly MethodInfo SetPropertyMethodInfo;
     static ExpressionGenerator()
     {
-        SetPropertyMethodInfo = typeof(SetPropertyCalls<TEntity>)
+        SetPropertyMethodInfo = typeof(UpdateSettersBuilder<TEntity>)
                                 .GetMethods()
-                                .First(m => m.Name == nameof(SetPropertyCalls<TEntity>.SetProperty) && !m.GetParameters()[1].ParameterType.IsGenericType);
+                                .First(m => m.Name == nameof(UpdateSettersBuilder<TEntity>.SetProperty) && !m.GetParameters()[1].ParameterType.IsGenericType);
     }
 
-    public static Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> BuildUpdateExpression(ICollection<Expression<Func<TEntity, object>>> properties,
-                                                                                                               TEntity model)
+    public static Action<UpdateSettersBuilder<TEntity>> BuildUpdateExpression(ICollection<Expression<Func<TEntity, object>>> properties,
+                                                                                                                       TEntity model)
     {
-        var parameter = Expression.Parameter(typeof(SetPropertyCalls<TEntity>), "c");
+        var parameter = Expression.Parameter(typeof(UpdateSettersBuilder<TEntity>), "c");
         Expression body = parameter;
 
         foreach (var propertySelector in properties)
@@ -45,12 +45,13 @@ public static class ExpressionGenerator<TEntity>
             body = Expression.Call(body, method, convertedPropertySelector, Expression.Constant(value, propertyType));
         }
 
-        return Expression.Lambda<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>>(body, parameter);
+        body = Expression.Block(typeof(void), body);
+        return Expression.Lambda<Action<UpdateSettersBuilder<TEntity>>>(body, parameter).Compile();
     }
 
-    public static Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> BuildUpdateExpression(IDictionary<string, object> propertyUpdates)
+    public static Action<UpdateSettersBuilder<TEntity>> BuildUpdateExpression(IDictionary<string, object> propertyUpdates)
     {
-        var parameter = Expression.Parameter(typeof(SetPropertyCalls<TEntity>), "c");
+        var parameter = Expression.Parameter(typeof(UpdateSettersBuilder<TEntity>), "c");
         Expression body = parameter;
         var entityParameter = Expression.Parameter(typeof(TEntity), "e");
         var properties = new Dictionary<Expression<Func<TEntity, object>>, object>();
@@ -99,6 +100,7 @@ public static class ExpressionGenerator<TEntity>
             body = Expression.Call(body, method, convertedPropertySelector, valueExpression);
         }
 
-        return Expression.Lambda<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>>(body, parameter);
+        body = Expression.Block(typeof(void), body);
+        return Expression.Lambda<Action<UpdateSettersBuilder<TEntity>>>(body, parameter).Compile();
     }
 }

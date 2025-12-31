@@ -1,9 +1,6 @@
 ﻿using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 
-using Benchmark.Helpers;
-using Benchmark.Models;
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 
@@ -11,7 +8,10 @@ using Softoverse.EntityFrameworkCore.Specification.Abstraction;
 using Softoverse.EntityFrameworkCore.Specification.Helpers;
 using Softoverse.EntityFrameworkCore.Specification.Implementation;
 
-namespace Benchmark.DataAccess;
+using TestConsole.Helpers;
+using TestConsole.Models;
+
+namespace TestConsole.DataAccess;
 
 public abstract class GenericRepository<TEntity, TKey>(ApplicationDbContext dbContext)
     : RepositoryBase<TEntity, TKey>(dbContext)

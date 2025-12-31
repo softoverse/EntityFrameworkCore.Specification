@@ -46,7 +46,7 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
 
     public Expression<Func<TEntity, object>>? ProjectionExpression { get; set; }
 
-    public Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>>? ExecuteUpdateExpression { get; set; }
+    public Action<UpdateSettersBuilder<TEntity>>? ExecuteUpdateExpression { get; set; }
     public List<Expression<Func<TEntity, object>>> ExecuteUpdateProperties { get; set; } = [];
 
     public void AddInclude(Expression<Func<TEntity, object>> includeExpression) => IncludeExpressions.Add(includeExpression);
@@ -59,7 +59,7 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
 
     public void SetProjection(Expression<Func<TEntity, object>> projectionExpression) => ProjectionExpression = projectionExpression;
 
-    public void SetExecuteUpdateExpression(Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> executeUpdateExpression) => ExecuteUpdateExpression = executeUpdateExpression;
+    public void SetExecuteUpdateExpression(Action<UpdateSettersBuilder<TEntity>> executeUpdateExpression) => ExecuteUpdateExpression = executeUpdateExpression;
 
     public void AddExecuteUpdateProperties(Expression<Func<TEntity, object>> propertySelector) => ExecuteUpdateProperties.Add(propertySelector);
 

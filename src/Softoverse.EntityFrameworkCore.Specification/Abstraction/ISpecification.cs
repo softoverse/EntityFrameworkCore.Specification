@@ -18,7 +18,7 @@ public interface ISpecification<TEntity> : ISpecificationForPrimaryKey where TEn
 
     public Expression<Func<TEntity, object>>? OrderByDescendingExpression { get; }
     public Expression<Func<TEntity, object>>? ProjectionExpression { get; }
-    public Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>>? ExecuteUpdateExpression { get; }
+    public Action<UpdateSettersBuilder<TEntity>>? ExecuteUpdateExpression { get; }
     
     public List<Expression<Func<TEntity, object>>> ExecuteUpdateProperties { get; }
 
@@ -32,7 +32,7 @@ public interface ISpecification<TEntity> : ISpecificationForPrimaryKey where TEn
 
     void SetProjection(Expression<Func<TEntity, object>> projectionExpression);
 
-    void SetExecuteUpdateExpression(Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> executeUpdateExpression);
+    void SetExecuteUpdateExpression(Action<UpdateSettersBuilder<TEntity>> executeUpdateExpression);
 
     void AddExecuteUpdateProperties(Expression<Func<TEntity, object>> propertySelector);
 }

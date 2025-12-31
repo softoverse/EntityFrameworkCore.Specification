@@ -1,13 +1,14 @@
-﻿using Benchmark.Models;
+﻿using Microsoft.EntityFrameworkCore;
 
-using Microsoft.EntityFrameworkCore;
+using TestConsole.Models;
 
-namespace Benchmark.DataAccess;
+namespace TestConsole.DataAccess;
 
 public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
     : DbContext(options)
 {
-    public DbSet<Article> Articles { get; set; }
+    public DbSet<Country> Countries { get; set; }
+    public DbSet<City> Cities { get; set; }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {

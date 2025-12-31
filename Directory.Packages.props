@@ -1,13 +1,22 @@
 <Project>
-  <PropertyGroup>
-    <!-- Enable central package management, https://learn.microsoft.com/en-us/nuget/consume-packages/Central-Package-Management -->
-    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-  </PropertyGroup>
-  <ItemGroup>
-    <PackageVersion Include="BenchmarkDotNet" Version="0.15.2" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.4" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.4" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.6" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Abstractions" Version="9.0.4" />
-  </ItemGroup>
+    <PropertyGroup>
+        <!-- Enable central package management, https://learn.microsoft.com/en-us/nuget/consume-packages/Central-Package-Management -->
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.1" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.1" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.1" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Abstractions" Version="10.0.1" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.1" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.1">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageVersion>
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.1">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageVersion>
+    </ItemGroup>
 </Project>
