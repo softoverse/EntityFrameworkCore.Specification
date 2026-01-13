@@ -60,7 +60,7 @@ internal static class ExpressionCombiner
 
     public static Expression<Func<TEntity, bool>> CombineWithAnd<TEntity>(IEnumerable<Expression<Func<TEntity, bool>>> expressions)
     {
-        Expression<Func<TEntity, bool>> combined = null;
+        Expression<Func<TEntity, bool>>? combined = null;
 
         foreach (var expression in expressions)
         {
@@ -72,7 +72,7 @@ internal static class ExpressionCombiner
 
     public static Expression<Func<TEntity, bool>> CombineWithOr<TEntity>(IEnumerable<Expression<Func<TEntity, bool>>> expressions)
     {
-        Expression<Func<TEntity, bool>> combined = null;
+        Expression<Func<TEntity, bool>> combined = null!;
 
         foreach (var expression in expressions)
         {
@@ -84,7 +84,7 @@ internal static class ExpressionCombiner
 
     public static Expression<Func<TEntity, bool>> CombineWithNot<TEntity>(IEnumerable<Expression<Func<TEntity, bool>>> expressions)
     {
-        Expression<Func<TEntity, bool>> combined = null;
+        Expression<Func<TEntity, bool>> combined = null!;
 
         foreach (var expression in expressions)
         {
@@ -116,7 +116,7 @@ internal static class ExpressionCombiner
     // With Predicates
     public static Expression<Func<TEntity, bool>> ToExpression<TEntity>(Func<TEntity, bool> predicate)
     {
-        return predicate == null ? True<TEntity>() : x => predicate(x);
+        return predicate == null! ? True<TEntity>() : x => predicate(x);
     }
 
     public static Expression<Func<TEntity, bool>> And<TEntity>(Func<TEntity, bool> predicate1, Func<TEntity, bool> predicate2)
@@ -141,7 +141,7 @@ internal static class ExpressionCombiner
 
     public static Expression<Func<TEntity, bool>> CombineWithAnd<TEntity>(IEnumerable<Func<TEntity, bool>> predicates)
     {
-        Func<TEntity, bool> combined = null;
+        Func<TEntity, bool> combined = null!;
 
         foreach (var predicate in predicates)
         {
@@ -153,7 +153,7 @@ internal static class ExpressionCombiner
 
     public static Expression<Func<TEntity, bool>> CombineWithOr<TEntity>(IEnumerable<Func<TEntity, bool>> predicates)
     {
-        Func<TEntity, bool> combined = null;
+        Func<TEntity, bool> combined = null!;
 
         foreach (var predicate in predicates)
         {
@@ -165,7 +165,7 @@ internal static class ExpressionCombiner
 
     public static Expression<Func<TEntity, bool>> CombineWithNot<TEntity>(IEnumerable<Func<TEntity, bool>> predicates)
     {
-        Func<TEntity, bool> combined = null;
+        Func<TEntity, bool> combined = null!;
 
         foreach (var predicate in predicates)
         {

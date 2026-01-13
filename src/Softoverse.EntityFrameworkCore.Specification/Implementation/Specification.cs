@@ -287,7 +287,7 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
                                                        parameter),
 
             _ => defaultExpression
-              ?? CreateExpression(propertySelector, (TProperty)ConvertToType(value, underlyingType), defaultOperation)
+              ?? CreateExpression(propertySelector, (TProperty)ConvertToType(value!, underlyingType), defaultOperation)
               ?? throw new ArgumentException($"'defaultExpression' was not being provided for the given value: {value}")
         };
 
@@ -370,7 +370,7 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
                         return Convert.ChangeType(input, targetType);
                     }
 
-                    return null;
+                    return null!;
                 }
             }
 
