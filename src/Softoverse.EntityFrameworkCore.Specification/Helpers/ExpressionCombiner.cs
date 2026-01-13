@@ -94,14 +94,17 @@ internal static class ExpressionCombiner
         return combined ?? True<TEntity>();
     }
 
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, object> TrueExpressions = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, object> FalseExpressions = new();
+
     public static Expression<Func<TEntity, bool>> True<TEntity>()
     {
-        return x => true;
+        return (Expression<Func<TEntity, bool>>)TrueExpressions.GetOrAdd(typeof(TEntity), _ => (Expression<Func<TEntity, bool>>)(x => true));
     }
 
     public static Expression<Func<TEntity, bool>> False<TEntity>()
     {
-        return x => false;
+        return (Expression<Func<TEntity, bool>>)FalseExpressions.GetOrAdd(typeof(TEntity), _ => (Expression<Func<TEntity, bool>>)(x => false));
     }
 
     public static Expression<Func<TEntity, bool>> When<TEntity>(bool condition, Expression<Func<TEntity, bool>> expression)

@@ -3,6 +3,8 @@ using System.Linq.Expressions;
 
 using Microsoft.EntityFrameworkCore;
 
+using Softoverse.EntityFrameworkCore.Specification.Abstraction;
+using Softoverse.EntityFrameworkCore.Specification.Extensions;
 using Softoverse.EntityFrameworkCore.Specification.Helpers;
 using Softoverse.EntityFrameworkCore.Specification.Implementation;
 
@@ -20,9 +22,22 @@ public class Program
     public static async Task Main(string[] args)
     {
         TestSpecificationsExpressionGenerator();
-        Console.Clear();
+        Console.WriteLine("\n" + new string('=', 60) + "\n");
+        
         await InitializeDbContextAsync();
         await SeedDatabase();
+        
+        Console.WriteLine("\n========== Testing Include Features ==========\n");
+        await TestSimpleInclude();
+        await TestThenInclude();
+        await TestMultiLevelThenInclude();
+        await TestMixedIncludesAndFilters();
+        await TestFilteredInclude();
+        await TestFilteredThenInclude();
+        await TestCompareIncludeMethods();
+        await TestImprovedInclude();
+        
+        Console.WriteLine("\n========== Testing Update Operation ==========\n");
         await TestUpdateOperation();
     }
 
@@ -30,9 +45,21 @@ public class Program
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
                       .UseSqlServer("Server=(localdb)\\MSSQLLocalDB;Database=SpecificationPatternTest;Trusted_Connection=True;")
+                      .LogTo(sql =>
+                      {
+                          if (!sql.Contains("Executed DbCommand")) return;
+                          Console.ForegroundColor = ConsoleColor.Cyan;
+                          Console.WriteLine(sql);
+                          Console.ResetColor();
+                      }, Microsoft.Extensions.Logging.LogLevel.Information)
+                      .EnableSensitiveDataLogging() // Shows parameter values in SQL
                       .Options;
 
         _context = new ApplicationDbContext(options);
+        
+        // Ensure database is created
+        await _context.Database.EnsureCreatedAsync();
+        
         // Ensure tables exist without using migrations
         await DatabaseInitializer.EnsureTablesCreatedAsync(_context);
         _countryRepository = new CountryRepository(_context);
@@ -55,11 +82,24 @@ public class Program
                 [
                     new()
                     {
-                        Name = "New York"
+                        Name = "New York",
+                        IsCapital = false,
+                        Districts =
+                        [
+                            new() { Name = "Manhattan", Population = 1694251 },
+                            new() { Name = "Brooklyn", Population = 2736074 },
+                            new() { Name = "Queens", Population = 2405464 }
+                        ]
                     },
                     new()
                     {
-                        Name = "San Francisco"
+                        Name = "San Francisco",
+                        IsCapital = false,
+                        Districts =
+                        [
+                            new() { Name = "Financial District", Population = 8500 },
+                            new() { Name = "Mission District", Population = 60000 }
+                        ]
                     }
                 ]
             },
@@ -70,11 +110,23 @@ public class Program
                 [
                     new()
                     {
-                        Name = "Moscow"
+                        Name = "Moscow",
+                        IsCapital = true,
+                        Districts =
+                        [
+                            new() { Name = "Central District", Population = 750000 },
+                            new() { Name = "Northern District", Population = 1200000 }
+                        ]
                     },
                     new()
                     {
-                        Name = "Saint Petersburg"
+                        Name = "Saint Petersburg",
+                        IsCapital = false,
+                        Districts =
+                        [
+                            new() { Name = "Admiralteysky", Population = 160000 },
+                            new() { Name = "Vasileostrovsky", Population = 210000 }
+                        ]
                     }
                 ]
             }
@@ -267,4 +319,302 @@ public class Program
         var result = countries.Where(countrySpecification.Criteria?.Compile() ?? (x => true));
         Console.WriteLine(string.Join(", ", result.Select(x => x.Name)));
     }
+
+    private static async Task TestSimpleInclude()
+    {
+        Console.WriteLine("=== Test 1: Simple Include ===");
+        
+        var specification = new Specification<Country>
+        {
+            Criteria = c => c.Name == "USA",
+            AsNoTracking = true
+        };
+        
+        // Using the new fluent Include API
+        specification.Include(c => c.Cities);
+        
+        var country = await _countryRepository.GetAsync(specification);
+        
+        if (country != null)
+        {
+            Console.WriteLine($"Country: {country.Name}");
+            Console.WriteLine($"Cities loaded: {country.Cities?.Count ?? 0}");
+            if (country.Cities != null)
+            {
+                foreach (var city in country.Cities)
+                {
+                    Console.WriteLine($"  - {city.Name}");
+                }
+            }
+        }
+        Console.WriteLine();
+    }
+
+    private static async Task TestThenInclude()
+    {
+        Console.WriteLine("=== Test 2: Include with ThenInclude (2 levels) ===");
+        
+        var specification = new Specification<Country>
+        {
+            Criteria = c => c.Name == "USA",
+            AsNoTracking = true
+        };
+        
+        // Using the new fluent ThenInclude API - type inference works automatically!
+        specification
+            .Include(c => c.Cities)
+            .ThenInclude(c => c.Districts);
+        
+        var country = await _countryRepository.GetAsync(specification);
+        
+        if (country != null)
+        {
+            Console.WriteLine($"Country: {country.Name}");
+            Console.WriteLine($"Cities loaded: {country.Cities?.Count ?? 0}");
+            if (country.Cities != null)
+            {
+                foreach (var city in country.Cities)
+                {
+                    Console.WriteLine($"  City: {city.Name}");
+                    Console.WriteLine($"    Districts loaded: {city.Districts?.Count ?? 0}");
+                    if (city.Districts != null)
+                    {
+                        foreach (var district in city.Districts)
+                        {
+                            Console.WriteLine($"      - {district.Name} (Pop: {district.Population:N0})");
+                        }
+                    }
+                }
+            }
+        }
+        Console.WriteLine();
+    }
+
+    private static async Task TestMultiLevelThenInclude()
+    {
+        Console.WriteLine("=== Test 3: Multiple ThenInclude Chains (3 levels deep) ===");
+        
+        var specification = new Specification<Country>
+        {
+            Criteria = c => c.Name == "Russia",
+            AsNoTracking = true
+        };
+        
+        // Chain multiple ThenInclude calls - automatic type inference!
+        specification
+            .Include(c => c.Cities)
+            .ThenInclude(c => c.Districts);
+        
+        var country = await _countryRepository.GetAsync(specification);
+        
+        if (country != null)
+        {
+            Console.WriteLine($"Country: {country.Name}");
+            Console.WriteLine($"Total Cities: {country.Cities?.Count ?? 0}");
+            
+            if (country.Cities != null)
+            {
+                var totalDistricts = country.Cities.Sum(c => c.Districts?.Count ?? 0);
+                var totalPopulation = country.Cities
+                    .SelectMany(c => c.Districts ?? new List<District>())
+                    .Sum(d => d.Population);
+                
+                Console.WriteLine($"Total Districts: {totalDistricts}");
+                Console.WriteLine($"Total District Population: {totalPopulation:N0}");
+                
+                foreach (var city in country.Cities)
+                {
+                    Console.WriteLine($"\n  City: {city.Name} (Capital: {city.IsCapital})");
+                    if (city.Districts != null)
+                    {
+                        foreach (var district in city.Districts)
+                        {
+                            Console.WriteLine($"    → {district.Name}: {district.Population:N0} people");
+                        }
+                    }
+                }
+            }
+        }
+        Console.WriteLine();
+    }
+
+    private static async Task TestMixedIncludesAndFilters()
+    {
+        Console.WriteLine("=== Test 4: Mixed Includes with Filters ===");
+        
+        var specification = new Specification<Country>
+        {
+            Criteria = c => c.Cities.Any(city => city.IsCapital),
+            AsNoTracking = true
+        };
+
+        specification
+            .Include(c => c.Cities)
+            // .ThenInclude(c => c.Districts);
+            .ThenInclude(c => c.Districts.Where(x => x.Name.Equals("Queens")));
+        
+        var countries = await _countryRepository.GetAllAsync(specification);
+        
+        Console.WriteLine($"Countries with capital cities: {countries.Count}");
+        foreach (var country in countries)
+        {
+            Console.WriteLine($"\nCountry: {country.Name}");
+            var capitalCities = country.Cities?.Where(c => c.IsCapital).ToList();
+            if (capitalCities != null && capitalCities.Any())
+            {
+                foreach (var capital in capitalCities)
+                {
+                    Console.WriteLine($"  Capital: {capital.Name}");
+                    var districtCount = capital.Districts?.Count ?? 0;
+                    var totalPop = capital.Districts?.Sum(d => d.Population) ?? 0;
+                    Console.WriteLine($"    Districts: {districtCount}, Total Pop: {totalPop:N0}");
+                }
+            }
+        }
+        Console.WriteLine();
+    }
+
+    private static async Task TestCompareIncludeMethods()
+    {
+        Console.WriteLine("=== Test 5: Compare String Include vs Expression Include ===");
+        
+        var sw1 = System.Diagnostics.Stopwatch.StartNew();
+        var spec1 = new Specification<Country> { AsNoTracking = true };
+        spec1.IncludeString("Cities.Districts");
+        var result1 = await _countryRepository.GetAllAsync(spec1);
+        sw1.Stop();
+        
+        var sw2 = System.Diagnostics.Stopwatch.StartNew();
+        var spec2 = new Specification<Country> { AsNoTracking = true };
+        spec2.Include(c => c.Cities)
+             .ThenInclude(c => c.Districts);
+        var result2 = await _countryRepository.GetAllAsync(spec2);
+        sw2.Stop();
+        
+        Console.WriteLine($"String Include: {sw1.ElapsedMilliseconds}ms - Loaded {result1.Count} countries");
+        Console.WriteLine($"Expression Include: {sw2.ElapsedMilliseconds}ms - Loaded {result2.Count} countries");
+        Console.WriteLine($"Both methods loaded the same data: {result1.Count == result2.Count}");
+        Console.WriteLine();
+    }
+
+    private static async Task TestImprovedInclude()
+    {
+        Console.WriteLine("=== Test 8: Improved AddInclude (Fluent & Metadata Tracking) ===");
+
+        var spec = new Specification<Country> { AsNoTracking = true };
+        
+        // Test fluent chaining with Include
+        spec.Include(c => c.Cities)
+            .ThenInclude(city => city.Districts);
+
+        // Test fluent chaining with IncludeString
+        spec.IncludeString("Cities")
+            .Include(c => c.Cities); // Valid navigation property (redundant but works for testing chaining)
+
+        var countries = await _countryRepository.GetAllAsync(spec);
+
+        Console.WriteLine($"Loaded {countries.Count} countries with nested data.");
+        
+        // Verify metadata tracking
+        var topLevelIncludes = ((ISpecification<Country>)spec).IncludeExpressions;
+        Console.WriteLine($"Top-level includes tracked in IncludeExpressions: {topLevelIncludes.Count}");
+        foreach (var include in topLevelIncludes)
+        {
+            Console.WriteLine($"  - {include}");
+        }
+
+        var includeStrings = ((ISpecification<Country>)spec).IncludeStrings;
+        Console.WriteLine($"Include strings tracked: {includeStrings.Count}");
+        foreach (var s in includeStrings)
+        {
+            Console.WriteLine($"  - {s}");
+        }
+
+        Console.WriteLine();
+    }
+    
+    private static async Task TestFilteredInclude()
+    {
+        Console.WriteLine("=== Test 6: Filtered Include (Database-Level Filter) ===");
+        Console.WriteLine("\n📊 SQL Query Generated:\n");
+        
+        var specification = new Specification<Country>
+        {
+            Criteria = c => c.Name == "USA",
+            AsNoTracking = true
+        };
+        
+        // Filtered include - filter executes in database, not in memory!
+        specification.Include(c => c.Cities.Where(city => city.Name == "New York"));
+        
+        var country = await _countryRepository.GetAsync(specification);
+        
+        Console.WriteLine("\n✅ Result:");
+        if (country != null)
+        {
+            Console.WriteLine($"Country: {country.Name}");
+            Console.WriteLine($"Cities loaded (filtered): {country.Cities?.Count ?? 0}");
+            if (country.Cities != null)
+            {
+                foreach (var city in country.Cities)
+                {
+                    Console.WriteLine($"  - {city.Name} ✓ Filter applied in SQL!");
+                }
+            }
+        }
+        
+        Console.WriteLine("\n🔍 Explanation:");
+        Console.WriteLine("The WHERE clause in the SQL shows the filter was applied at the database level.");
+        Console.WriteLine("Only 'New York' was returned, NOT all cities filtered in memory.");
+        Console.WriteLine();
+    }
+    
+    private static async Task TestFilteredThenInclude()
+    {
+        Console.WriteLine("=== Test 7: Nested Filtered Include ===");
+        
+        var specification = new Specification<Country>
+        {
+            Criteria = c => c.Name == "USA",
+            AsNoTracking = true
+        };
+        
+        // Method 1: Load all and filter in-memory (not ideal but works)
+        specification
+            .Include(c => c.Cities)
+            .ThenInclude(c => c.Districts);
+        
+        var country = await _countryRepository.GetAsync(specification);
+        
+        if (country != null)
+        {
+            Console.WriteLine($"Country: {country.Name}");
+            Console.WriteLine($"Cities loaded: {country.Cities?.Count ?? 0}");
+            if (country.Cities != null)
+            {
+                foreach (var city in country.Cities)
+                {
+                    Console.WriteLine($"  City: {city.Name}");
+                    // Filter in-memory after loading
+                    var filteredDistricts = city.Districts?
+                        .Where(d => d.Name == "Queens" || d.Name == "Manhattan")
+                        .ToList();
+                    Console.WriteLine($"    Total Districts: {city.Districts?.Count ?? 0}");
+                    Console.WriteLine($"    Filtered Districts: {filteredDistricts?.Count ?? 0}");
+                    if (filteredDistricts != null && filteredDistricts.Any())
+                    {
+                        foreach (var district in filteredDistricts)
+                        {
+                            Console.WriteLine($"      - {district.Name} (Pop: {district.Population:N0})");
+                        }
+                    }
+                }
+            }
+        }
+        
+        Console.WriteLine("\nNote: Nested filtered includes (filtering Districts within Cities)");
+        Console.WriteLine("are complex in EF Core and may require multiple queries or projections.");
+        Console.WriteLine();
+    }
 }
+

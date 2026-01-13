@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Linq.Expressions;
+using System.Reflection;
 
 namespace Benchmark.Helpers;
 
@@ -41,94 +42,121 @@ public static class ProjectionExtensions
         var sourceType = typeof(TSource);
         var targetType = typeof(TTarget);
 
-        // Check cache first
-        if (ProjectionCache.TryGetValue(sourceType, out var targetCache) &&
-            targetCache.TryGetValue(targetType, out var projection))
+        // Only use cache for default projections as custom mappings are highly variable
+        if (customMapping == null)
         {
-            return (Expression<Func<TSource, TTarget>>)projection;
+            if (ProjectionCache.TryGetValue(sourceType, out var targetCache) &&
+                targetCache.TryGetValue(targetType, out var cachedProjection))
+            {
+                return (Expression<Func<TSource, TTarget>>)cachedProjection;
+            }
         }
 
         var parameter = Expression.Parameter(sourceType, "entity");
-        var bindings = new List<MemberBinding>();
-        var targetProperties = targetType.GetProperties();
+        var bindings = new Dictionary<string, MemberBinding>();
+        
+        // Use a case-insensitive lookup for matching properties if needed, 
+        // but here we follow standard property naming conventions
+        var targetProperties = targetType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                                         .Where(p => p.CanWrite);
 
         // Generate default property mappings
         foreach (var targetProperty in targetProperties)
         {
-            var sourceProperty = sourceType.GetProperty(targetProperty.Name);
+            var sourceProperty = sourceType.GetProperty(targetProperty.Name, BindingFlags.Public | BindingFlags.Instance);
 
-            if (sourceProperty == null || sourceProperty.PropertyType != targetProperty.PropertyType)
+            if (sourceProperty == null || !targetProperty.PropertyType.IsAssignableFrom(sourceProperty.PropertyType))
                 continue;
 
             var propertyAccess = Expression.Property(parameter, sourceProperty);
             var binding = Expression.Bind(targetProperty, propertyAccess);
-            bindings.Add(binding);
+            bindings[targetProperty.Name] = binding;
         }
 
-        // Create the default projection
-        var constructor = Expression.New(targetType);
-        var memberInit = Expression.MemberInit(constructor, bindings);
-
-        // If custom mapping is provided, combine it with the default projection
+        // If custom mapping is provided, merge it with default bindings
         if (customMapping != null)
         {
-            // Convert the custom mapping expression to match the target type
-            var customMappingBody = new CustomMappingVisitor(parameter).Visit(customMapping.Body);
-            var customMappingExpression = Expression.Lambda<Func<TSource, TTarget>>(
-                Expression.MemberInit(
-                    constructor,
-                    bindings.Concat(new[] { Expression.Bind(
-                        targetType.GetProperty("CustomProperty"), // Replace with the actual target property
-                        customMappingBody
-                    )}).ToList()
-                ),
-                parameter
-            );
+            var visitor = new ParameterUpdateVisitor(customMapping.Parameters[0], parameter);
+            var customBody = visitor.Visit(customMapping.Body);
 
-            // Cache the projection
-            if (!ProjectionCache.TryGetValue(sourceType, out var value))
+            // Unwrap boxing if any
+            if (customBody is UnaryExpression { NodeType: ExpressionType.Convert } unary)
             {
-                value = new ConcurrentDictionary<Type, LambdaExpression>();
-                ProjectionCache[sourceType] = value;
+                customBody = unary.Operand;
             }
 
-            value[targetType] = customMappingExpression;
-
-            return customMappingExpression;
+            // Support anonymous types or new expressions
+            if (customBody is NewExpression newExp && newExp.Members != null)
+            {
+                for (int i = 0; i < newExp.Members.Count; i++)
+                {
+                    var member = newExp.Members[i];
+                    var argument = newExp.Arguments[i];
+                    
+                    var targetProperty = targetType.GetProperty(member.Name, BindingFlags.Public | BindingFlags.Instance);
+                    if (targetProperty != null && targetProperty.CanWrite)
+                    {
+                        bindings[targetProperty.Name] = Expression.Bind(targetProperty, argument);
+                    }
+                }
+            }
+            // Support member initialization: x => new Dest { Prop = x.Value }
+            else if (customBody is MemberInitExpression memberInit)
+            {
+                foreach (var binding in memberInit.Bindings)
+                {
+                    if (binding is MemberAssignment assignment)
+                    {
+                        var targetProperty = targetType.GetProperty(binding.Member.Name, BindingFlags.Public | BindingFlags.Instance);
+                        if (targetProperty != null && targetProperty.CanWrite)
+                        {
+                            bindings[targetProperty.Name] = Expression.Bind(targetProperty, assignment.Expression);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Fallback for single value mapping: match by a property named 'CustomProperty' ONLY if it exists
+                var customProperty = targetType.GetProperty("CustomProperty", BindingFlags.Public | BindingFlags.Instance);
+                if (customProperty != null && customProperty.CanWrite)
+                {
+                    bindings[customProperty.Name] = Expression.Bind(customProperty, customBody);
+                }
+            }
         }
-        else
+
+        var constructor = Expression.New(targetType);
+        var memberInitFinal = Expression.MemberInit(constructor, bindings.Values);
+        var lambda = Expression.Lambda<Func<TSource, TTarget>>(memberInitFinal, parameter);
+
+        // Cache the default projection
+        if (customMapping == null)
         {
-            // Cache the default projection
-            var lambda = Expression.Lambda<Func<TSource, TTarget>>(memberInit, parameter);
-
-            if (!ProjectionCache.TryGetValue(sourceType, out var value))
-            {
-                value = new ConcurrentDictionary<Type, LambdaExpression>();
-                ProjectionCache[sourceType] = value;
-            }
-
-            value[targetType] = lambda;
-
-            return lambda;
+            var targetCache = ProjectionCache.GetOrAdd(sourceType, _ => new ConcurrentDictionary<Type, LambdaExpression>());
+            targetCache[targetType] = lambda;
         }
+
+        return lambda;
     }
 
     /// <summary>
-    /// A visitor to replace the parameter in the custom mapping expression with the projection parameter.
+    /// A visitor to replace the original lambda parameter with the new projection parameter.
     /// </summary>
-    private class CustomMappingVisitor : ExpressionVisitor
+    private class ParameterUpdateVisitor : ExpressionVisitor
     {
-        private readonly ParameterExpression _parameter;
+        private readonly ParameterExpression _oldParameter;
+        private readonly ParameterExpression _newParameter;
 
-        public CustomMappingVisitor(ParameterExpression parameter)
+        public ParameterUpdateVisitor(ParameterExpression oldParameter, ParameterExpression newParameter)
         {
-            _parameter = parameter;
+            _oldParameter = oldParameter;
+            _newParameter = newParameter;
         }
 
         protected override Expression VisitParameter(ParameterExpression node)
         {
-            // Replace the original parameter with the projection parameter
-            return _parameter;
+            return node == _oldParameter ? _newParameter : base.VisitParameter(node);
         }
     }
 }

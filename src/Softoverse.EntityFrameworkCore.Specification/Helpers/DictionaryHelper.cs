@@ -2,7 +2,7 @@
 
 namespace Softoverse.EntityFrameworkCore.Specification.Helpers;
 
-public static class DictionaryHelper
+internal static class DictionaryHelper
 {
     public static IDictionary<string, object> FlattenDictionary(this IDictionary<string, object> dictionary, string parentKey = "")
     {

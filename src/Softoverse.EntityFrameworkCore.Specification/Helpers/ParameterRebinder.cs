@@ -2,7 +2,7 @@
 
 namespace Softoverse.EntityFrameworkCore.Specification.Helpers;
 
-public class ParameterRebinder : ExpressionVisitor
+internal class ParameterRebinder : ExpressionVisitor
 {
     private readonly ParameterExpression _oldParameter;
     private readonly ParameterExpression _newParameter;

@@ -6,13 +6,10 @@ namespace Softoverse.EntityFrameworkCore.Specification.Implementation;
 
 public static class SpecificationEvaluator
 {
-    private static async Task<IQueryable<TEntity>> GenerateQuery<TEntity>(
-        DbSet<TEntity> inputQueryable,
-        ISpecification<TEntity> specification,
-        CancellationToken ct = default)
+    public static IQueryable<TEntity> ApplySpecification<TEntity>(this IQueryable<TEntity> inputQueryable,
+                                                                   ISpecification<TEntity> specification)
         where TEntity : class
     {
-        // Create the initial queryable
         IQueryable<TEntity> queryable = inputQueryable;
 
         // Apply no tracking if specified
@@ -21,33 +18,12 @@ public static class SpecificationEvaluator
             queryable = queryable.AsNoTracking();
         }
 
-        // Apply includes
-        queryable = specification.IncludeExpressions.Aggregate(
-                                                               queryable,
-                                                               (current, includeExpression) => current.Include(includeExpression));
-
-        queryable = specification.IncludeStrings.Aggregate(
-                                                           queryable,
-                                                           (current, include) => current.Include(include));
-
-        // Handle primary key search
-        if (specification.PrimaryKey is not null)
+        // Apply all includes via IncludeActions (consolidated from expressions, strings and actions)
+        if (specification.IncludeActions.Any())
         {
-            // TODO: Add support for multiple primary keys
-            // TODO: Remove support for includes for FindAsync method
-            inputQueryable = specification.IncludeExpressions.Aggregate(inputQueryable, (current, includeExpression) => current.Include(includeExpression) as DbSet<TEntity>);
-            inputQueryable = specification.IncludeStrings.Aggregate(inputQueryable, (current, include) => (DbSet<TEntity>)current.Include(include));
-
-            // If PrimaryKey is set, use Find and return a single-item query
-            var entity = await inputQueryable.FindAsync([
-                specification.PrimaryKey
-            ], cancellationToken: ct);
-            return entity != null
-                ? new[]
-                {
-                    entity
-                }.AsQueryable()
-                : Enumerable.Empty<TEntity>().AsQueryable();
+            queryable = specification.IncludeActions.Aggregate(
+                queryable,
+                (current, includeAction) => includeAction(current));
         }
 
         // Apply filtering
@@ -56,8 +32,11 @@ public static class SpecificationEvaluator
             queryable = queryable.Where(specification.Criteria);
         }
 
+        // Apply projection
         if (specification.ProjectionExpression is not null)
         {
+            // Note: Select() followed by OfType<TEntity>() might not be what's always intended if TResult != TEntity,
+            // but we'll keep the existing logic for now.
             queryable = queryable.Select(specification.ProjectionExpression).OfType<TEntity>();
         }
 
@@ -80,64 +59,13 @@ public static class SpecificationEvaluator
         return queryable;
     }
 
-    public static async Task<IQueryable<TEntity>> ApplySpecification<TEntity>(this DbSet<TEntity> query, ISpecification<TEntity> specification, CancellationToken ct = default) where TEntity : class
+    public static IQueryable<TEntity> ApplySpecification<TEntity>(this DbSet<TEntity> query, ISpecification<TEntity> specification) where TEntity : class
     {
-        return await GenerateQuery(query, specification, ct);
+        return ApplySpecification(query.AsQueryable(), specification);
     }
 
-    public static async Task<IQueryable<TEntity>> ApplySpecification<TEntity>(this DbContext dbContext, ISpecification<TEntity> specification, CancellationToken ct = default) where TEntity : class
+    public static IQueryable<TEntity> ApplySpecification<TEntity>(this DbContext dbContext, ISpecification<TEntity> specification) where TEntity : class
     {
-        return await ApplySpecification(dbContext.Set<TEntity>(), specification, ct);
-    }
-
-    [Obsolete("", true)]
-    private static async Task<IQueryable<TEntity>> GenerateQueryOld<TEntity>(
-        DbSet<TEntity> inputQueryable,
-        ISpecification<TEntity> specification,
-        CancellationToken ct = default)
-        where TEntity : class
-    {
-        IQueryable<TEntity> queryable = inputQueryable;
-        if (specification.AsNoTracking)
-        {
-            queryable = inputQueryable.AsNoTracking();
-        }
-
-        if (specification.PrimaryKey is not null)
-        {
-            inputQueryable = specification.IncludeExpressions.Aggregate(inputQueryable, (current, includeExpression) => (DbSet<TEntity>)current.Include(includeExpression));
-            inputQueryable = specification.IncludeStrings.Aggregate(inputQueryable, (current, include) => (DbSet<TEntity>)current.Include(include));
-
-            // If PrimaryKey is set, use Find and return a single-item query
-            var entity = await inputQueryable.FindAsync(specification.PrimaryKey, ct);
-            return entity != null ? new List<TEntity>
-            {
-                entity
-            }.AsQueryable() : Enumerable.Empty<TEntity>().AsQueryable();
-        }
-
-        queryable = specification.IncludeExpressions.Aggregate(queryable, (current, includeExpression) => current.Include(includeExpression));
-        queryable = specification.IncludeStrings.Aggregate(queryable, (current, include) => current.Include(include));
-
-        if (specification.Criteria is not null)
-        {
-            queryable = queryable.Where(specification.Criteria);
-        }
-
-        if (specification.OrderByExpression is not null)
-        {
-            queryable = queryable.OrderBy(specification.OrderByExpression);
-        }
-        else if (specification.OrderByDescendingExpression is not null)
-        {
-            queryable = queryable.OrderByDescending(specification.OrderByDescendingExpression);
-        }
-
-        if (specification.AsSplitQuery)
-        {
-            queryable = queryable.AsSplitQuery();
-        }
-
-        return queryable;
+        return ApplySpecification(dbContext.Set<TEntity>(), specification);
     }
 }

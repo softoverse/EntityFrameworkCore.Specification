@@ -11,20 +11,31 @@ public interface ISpecification<TEntity> : ISpecificationForPrimaryKey where TEn
 
     public Expression<Func<TEntity, bool>>? Criteria { get; }
 
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public List<Expression<Func<TEntity, object>>> IncludeExpressions { get; }
+
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public List<string> IncludeStrings { get; }
+
+    /// <summary>
+    /// List of include expressions with optional filter conditions
+    /// </summary>
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    public List<Func<IQueryable<TEntity>, IQueryable<TEntity>>> IncludeActions { get; }
 
     public Expression<Func<TEntity, object>>? OrderByExpression { get; }
 
     public Expression<Func<TEntity, object>>? OrderByDescendingExpression { get; }
     public Expression<Func<TEntity, object>>? ProjectionExpression { get; }
     public Action<UpdateSettersBuilder<TEntity>>? ExecuteUpdateExpression { get; }
-    
+
     public List<Expression<Func<TEntity, object>>> ExecuteUpdateProperties { get; }
 
-    void AddInclude(Expression<Func<TEntity, object>> includeExpression);
+    [Obsolete("Use Include instead", false)]
+    IIncludableSpecification<TEntity, TProperty> AddInclude<TProperty>(Expression<Func<TEntity, TProperty>> includeExpression);
 
-    void AddIncludeString(string includeString);
+    [Obsolete("Use IncludeString instead", false)]
+    IIncludableSpecification<TEntity, object> AddIncludeString(string includeString);
 
     void AddOrderBy(Expression<Func<TEntity, object>> orderByExpression);
 
@@ -35,4 +46,8 @@ public interface ISpecification<TEntity> : ISpecificationForPrimaryKey where TEn
     void SetExecuteUpdateExpression(Action<UpdateSettersBuilder<TEntity>> executeUpdateExpression);
 
     void AddExecuteUpdateProperties(Expression<Func<TEntity, object>> propertySelector);
+
+    IIncludableSpecification<TEntity, TProperty> Include<TProperty>(Expression<Func<TEntity, TProperty>> includeExpression);
+
+    IIncludableSpecification<TEntity, object> IncludeString(string includeString);
 }

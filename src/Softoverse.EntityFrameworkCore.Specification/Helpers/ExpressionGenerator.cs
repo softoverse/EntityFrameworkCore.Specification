@@ -32,7 +32,16 @@ public static class ExpressionGenerator<TEntity>
             var compiledSelector = PropertyCompiledSelectors.GetOrAdd(propertySelector.Body, _ => propertySelector.Compile());
 
             object value = compiledSelector(model);
-            Type propertyType = value.GetType();
+            
+            // Extract property type from expression tree instead of using reflection on value
+            Type propertyType = GetPropertyType(propertySelector.Body);
+            
+            // Handle null values - use property type directly
+            if (value == null)
+            {
+                // For nullable types, keep null; for value types this would be problematic
+                // but we'll let EF Core handle it
+            }
 
             var method = SetPropertyMethodInfo.MakeGenericMethod(propertyType);
 
@@ -79,7 +88,24 @@ public static class ExpressionGenerator<TEntity>
         {
             var propertySelector = kvp.Key;
             var value = kvp.Value;
-            Type propertyType = value.GetType();
+            
+            // Extract property type from expression tree instead of using reflection on value
+            Type propertyType = GetPropertyType(propertySelector.Body);
+
+            // Convert value to the correct property type if needed
+            object convertedValue = value;
+            if (value != null && value.GetType() != propertyType)
+            {
+                try
+                {
+                    convertedValue = Convert.ChangeType(value, Nullable.GetUnderlyingType(propertyType) ?? propertyType);
+                }
+                catch
+                {
+                    // If conversion fails, use the original value
+                    convertedValue = value;
+                }
+            }
 
             var method = SetPropertyMethodInfo.MakeGenericMethod(propertyType);
 
@@ -91,16 +117,41 @@ public static class ExpressionGenerator<TEntity>
 
             var convertedPropertySelector = Expression.Lambda(propertyExpression, propertySelector.Parameters);
 
-            Expression valueExpression = Expression.Constant(value, propertyType);
-            if (propertyType.IsValueType)
-            {
-                valueExpression = Expression.Convert(valueExpression, propertyType);
-            }
+            Expression valueExpression = Expression.Constant(convertedValue, propertyType);
 
             body = Expression.Call(body, method, convertedPropertySelector, valueExpression);
         }
 
         body = Expression.Block(typeof(void), body);
         return Expression.Lambda<Action<UpdateSettersBuilder<TEntity>>>(body, parameter).Compile();
+    }
+    
+    /// <summary>
+    /// Extracts the actual property type from an expression tree, unwrapping Convert nodes
+    /// </summary>
+    private static Type GetPropertyType(Expression expression)
+    {
+        // Unwrap Convert/ConvertChecked expressions
+        while (expression is UnaryExpression { NodeType: ExpressionType.Convert or ExpressionType.ConvertChecked } unary)
+        {
+            expression = unary.Operand;
+        }
+
+        // Get the type from MemberExpression
+        if (expression is MemberExpression memberExpression)
+        {
+            if (memberExpression.Member is PropertyInfo propertyInfo)
+            {
+                return propertyInfo.PropertyType;
+            }
+            
+            if (memberExpression.Member is FieldInfo fieldInfo)
+            {
+                return fieldInfo.FieldType;
+            }
+        }
+
+        // Fallback to expression type
+        return expression.Type;
     }
 }

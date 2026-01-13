@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿﻿using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TestConsole.Models;
 
@@ -10,4 +10,6 @@ public class City : Entity
     [ForeignKey(nameof(CountryId))]
     public long CountryId { get; set; }
     public Country? Country { get; set; }
+    
+    public List<District> Districts { get; set; } = [];
 }

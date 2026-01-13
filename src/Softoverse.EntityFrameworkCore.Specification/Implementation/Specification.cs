@@ -1,6 +1,7 @@
 ﻿using System.Linq.Expressions;
 using System.Numerics;
 
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 
 using Softoverse.EntityFrameworkCore.Specification.Abstraction;
@@ -10,6 +11,13 @@ namespace Softoverse.EntityFrameworkCore.Specification.Implementation;
 
 public class Specification<TEntity> : ISpecification<TEntity> where TEntity : class
 {
+    // Cache string methods to avoid reflection overhead
+    private static readonly System.Reflection.MethodInfo StringToLowerMethod = 
+        typeof(string).GetMethod(nameof(string.ToLower), Type.EmptyTypes)!;
+    
+    private static readonly System.Reflection.MethodInfo StringContainsMethod = 
+        typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(string) })!;
+    
     public Specification() { }
 
     public Specification(List<Expression<Func<TEntity, bool>>> expressions, CombineType combineType = CombineType.And, bool asNoTracking = false, bool asSplitQuery = false)
@@ -38,8 +46,16 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
     public bool AsSplitQuery { get; set; }
     public bool AsNoTracking { get; set; }
 
-    public List<Expression<Func<TEntity, object>>> IncludeExpressions { get; } = [];
-    public List<string> IncludeStrings { get; } = [];
+    internal List<Expression<Func<TEntity, object>>> IncludeExpressions { get; } = [];
+    internal List<string> IncludeStrings { get; } = [];
+    internal List<Func<IQueryable<TEntity>, IQueryable<TEntity>>> IncludeActions { get; } = [];
+
+    List<Expression<Func<TEntity, object>>> ISpecification<TEntity>.IncludeExpressions => IncludeExpressions;
+    List<string> ISpecification<TEntity>.IncludeStrings => IncludeStrings;
+    List<Func<IQueryable<TEntity>, IQueryable<TEntity>>> ISpecification<TEntity>.IncludeActions => IncludeActions;
+
+    private string? _currentIncludePath;
+    private Expression? _currentIncludeExpression;
 
     public Expression<Func<TEntity, object>>? OrderByExpression { get; set; }
     public Expression<Func<TEntity, object>>? OrderByDescendingExpression { get; set; }
@@ -49,9 +65,23 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
     public Action<UpdateSettersBuilder<TEntity>>? ExecuteUpdateExpression { get; set; }
     public List<Expression<Func<TEntity, object>>> ExecuteUpdateProperties { get; set; } = [];
 
-    public void AddInclude(Expression<Func<TEntity, object>> includeExpression) => IncludeExpressions.Add(includeExpression);
+    [Obsolete("Use Include instead", false)]
+    public IIncludableSpecification<TEntity, TProperty> AddInclude<TProperty>(Expression<Func<TEntity, TProperty>> includeExpression) 
+    {
+        return Include(includeExpression);
+    }
 
-    public void AddIncludeString(string includeString) => IncludeStrings.Add(includeString);
+    [Obsolete("Use IncludeString instead", false)]
+    public IIncludableSpecification<TEntity, object> AddIncludeString(string includeString) 
+    {
+        _currentIncludePath = includeString;
+        _currentIncludeExpression = null;
+
+        IncludeStrings.Add(includeString);
+        IncludeActions.Add(query => query.Include(includeString));
+        
+        return new IncludableSpecification<TEntity, object>(this);
+    }
 
     public void AddOrderBy(Expression<Func<TEntity, object>> orderByExpression) => OrderByExpression = orderByExpression;
 
@@ -62,6 +92,70 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
     public void SetExecuteUpdateExpression(Action<UpdateSettersBuilder<TEntity>> executeUpdateExpression) => ExecuteUpdateExpression = executeUpdateExpression;
 
     public void AddExecuteUpdateProperties(Expression<Func<TEntity, object>> propertySelector) => ExecuteUpdateProperties.Add(propertySelector);
+
+    public IIncludableSpecification<TEntity, TProperty> Include<TProperty>(Expression<Func<TEntity, TProperty>> includeExpression)
+    {
+        var path = IncludePathBuilder.GetPropertyPath(includeExpression);
+        _currentIncludePath = string.IsNullOrEmpty(path) ? "[Filtered]" : path;
+        _currentIncludeExpression = includeExpression;
+        
+        // Add to IncludeExpressions list for metadata tracking
+        var body = includeExpression.Body;
+        if (body.Type != typeof(object))
+        {
+            body = Expression.Convert(body, typeof(object));
+        }
+        var converted = Expression.Lambda<Func<TEntity, object>>(body, includeExpression.Parameters);
+        IncludeExpressions.Add(converted);
+
+        // Add the include action - this will be applied to the query
+        // The action stores the expression so EF Core can handle filtering
+        IncludeActions.Add(query => query.Include(includeExpression));
+        
+        return new IncludableSpecification<TEntity, TProperty>(this);
+    }
+
+    public IIncludableSpecification<TEntity, object> IncludeString(string includeString) 
+    {
+        _currentIncludePath = includeString;
+        _currentIncludeExpression = null;
+
+        IncludeStrings.Add(includeString);
+        IncludeActions.Add(query => query.Include(includeString));
+        
+        return new IncludableSpecification<TEntity, object>(this);
+    }
+    
+    internal void AppendThenInclude<TPreviousProperty, TProperty>(
+        Expression<Func<TPreviousProperty, TProperty>> navigationPropertyPath,
+        Expression? previousIncludeExpression = null)
+    {
+        var path = IncludePathBuilder.GetThenIncludePropertyPath(navigationPropertyPath);
+        
+        // Update current include path tracking (still useful for metadata or debugging)
+        if (string.IsNullOrEmpty(path) || _currentIncludePath == "[Filtered]")
+        {
+            _currentIncludePath = "[Filtered]";
+        }
+        else if (!string.IsNullOrEmpty(_currentIncludePath))
+        {
+            _currentIncludePath = $"{_currentIncludePath}.{path}";
+        }
+
+        // Apply ThenInclude using IncludeActions
+        if (IncludeActions.Count > 0)
+        {
+            var lastAction = IncludeActions[^1];
+            IncludeActions[^1] = query =>
+            {
+                var included = lastAction(query);
+                // Use dynamic to call ThenInclude as it handles various collection types and navigation properties
+                return (IQueryable<TEntity>)EntityFrameworkQueryableExtensions.ThenInclude((dynamic)included, (dynamic)navigationPropertyPath);
+            };
+        }
+        
+        _currentIncludeExpression = navigationPropertyPath;
+    }
 
     internal static Expression<Func<TEntity, bool>> ToConditionalExpressionInternal<TProperty>(Expression<Func<TEntity, TProperty>> propertySelector,
                                                                                                object value,
@@ -107,6 +201,8 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
 
         var splitValues = value?.ToString()?.Split(':') ?? [];
         var condition = splitValues[0].ToLower();
+        var parameterValue = splitValues.Length > 1 ? splitValues[1] : string.Empty;
+        var commaSplitValues = parameterValue.Split(splitBy);
 
         var parameter = propertySelector.Parameters[0];
         var property = propertySelector.Body;
@@ -116,78 +212,78 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
         {
             lessThan or lessThanOrEqual or greaterThan or greaterThanOrEqual or equal or notEqual =>
                 Expression.Lambda<Func<TEntity, bool>>(
-                                                       BuildComparisonExpression(property, condition, ConvertToType(splitValues[1], underlyingType), targetType),
+                                                       BuildComparisonExpression(property, condition, ConvertToType(parameterValue, underlyingType), targetType),
                                                        parameter),
 
             equalCaseInsensitive when targetType == typeof(string) =>
                 Expression.Lambda<Func<TEntity, bool>>(
                                                        Expression.Equal(
-                                                                        Expression.Call(property, typeof(string).GetMethod(nameof (string.ToLower), Type.EmptyTypes)!),
-                                                                        Expression.Constant(splitValues[1].ToLower())),
+                                                                        Expression.Call(property, StringToLowerMethod),
+                                                                        Expression.Constant(parameterValue.ToLower())),
                                                        parameter),
 
             like =>
                 Expression.Lambda<Func<TEntity, bool>>(
                                                        Expression.Call(
                                                                        property,
-                                                                       typeof(string).GetMethod(nameof (string.Contains), [typeof(string)])!,
-                                                                       Expression.Constant(splitValues[1])),
+                                                                       StringContainsMethod,
+                                                                       Expression.Constant(parameterValue)),
                                                        parameter),
 
             likeCaseInsensitive =>
                 Expression.Lambda<Func<TEntity, bool>>(
                                                        Expression.Call(
-                                                                       Expression.Call(property, typeof(string).GetMethod(nameof (string.ToLower), Type.EmptyTypes)!),
-                                                                       typeof(string).GetMethod(nameof (string.Contains), [typeof(string)])!,
-                                                                       Expression.Constant(splitValues[1].ToLower())),
+                                                                       Expression.Call(property, StringToLowerMethod),
+                                                                       StringContainsMethod,
+                                                                       Expression.Constant(parameterValue.ToLower())),
                                                        parameter),
 
-            range =>
+            range when commaSplitValues.Length >= 2 =>
                 Expression.Lambda<Func<TEntity, bool>>(
                                                        Expression.AndAlso(
-                                                                          BuildComparisonExpression(property, greaterThanOrEqual, ConvertToType(splitValues[1].Split(splitBy)[0], underlyingType), targetType),
-                                                                          BuildComparisonExpression(property, lessThanOrEqual, ConvertToType(splitValues[1].Split(splitBy)[1], underlyingType), targetType)
+                                                                          BuildComparisonExpression(property, greaterThanOrEqual, ConvertToType(commaSplitValues[0], underlyingType), targetType),
+                                                                          BuildComparisonExpression(property, lessThanOrEqual, ConvertToType(commaSplitValues[1], underlyingType), targetType)
                                                                          ),
                                                        parameter),
 
             @in =>
                 Expression.Lambda<Func<TEntity, bool>>(
-                                                       BuildInExpression(property, splitValues[1].Split(splitBy), underlyingType, isNotIn: false),
+                                                       BuildInExpression(property, commaSplitValues, underlyingType, isNotIn: false),
                                                        parameter),
 
             nin =>
                 Expression.Lambda<Func<TEntity, bool>>(
-                                                       BuildInExpression(property, splitValues[1].Split(splitBy), underlyingType, isNotIn: true),
+                                                       BuildInExpression(property, commaSplitValues, underlyingType, isNotIn: true),
                                                        parameter),
 
             inCaseInsensitive when targetType == typeof(string) =>
                 Expression.Lambda<Func<TEntity, bool>>(
-                                                       BuildInExpression(property, splitValues[1].Split(splitBy), underlyingType, isNotIn: false, caseInsensitive: true),
+                                                       BuildInExpression(property, commaSplitValues, underlyingType, isNotIn: false, caseInsensitive: true),
                                                        parameter),
 
             ninCaseInsensitive when targetType == typeof(string) =>
                 Expression.Lambda<Func<TEntity, bool>>(
-                                                       BuildInExpression(property, splitValues[1].Split(splitBy), underlyingType, isNotIn: true, caseInsensitive: true),
+                                                       BuildInExpression(property, commaSplitValues, underlyingType, isNotIn: true, caseInsensitive: true),
                                                        parameter),
 
             inLike =>
                 Expression.Lambda<Func<TEntity, bool>>(
-                                                       BuildInExpression(property, splitValues[1].Split(splitBy), underlyingType, isNotIn: false, isLike: true),
+                                                       BuildInExpression(property, commaSplitValues, underlyingType, isNotIn: false, isLike: true),
                                                        parameter),
 
             ninLike =>
                 Expression.Lambda<Func<TEntity, bool>>(
-                                                       BuildInExpression(property, splitValues[1].Split(splitBy), underlyingType, isNotIn: true, isLike: true),
+                                                       BuildInExpression(property, commaSplitValues, underlyingType, isNotIn: true, isLike: true),
                                                        parameter),
 
             inLikeCaseInsensitive when targetType == typeof(string) =>
                 Expression.Lambda<Func<TEntity, bool>>(
-                                                       BuildInExpression(property, splitValues[1].Split(splitBy), underlyingType, isNotIn: false, isLike: true, caseInsensitive: true),
+                                                       BuildInExpression(property, commaSplitValues, underlyingType, isNotIn: false, isLike: true, caseInsensitive: true),
                                                        parameter),
 
             ninLikeCaseInsensitive when targetType == typeof(string) =>
                 Expression.Lambda<Func<TEntity, bool>>(
-                                                       BuildInExpression(property, splitValues[1].Split(splitBy), underlyingType, isNotIn: true, isLike: true, caseInsensitive: true),
+                                                       BuildInExpression(property, commaSplitValues, underlyingType, isNotIn: true, isLike: true, caseInsensitive: true),
                                                        parameter),
 
             _ => defaultExpression
@@ -292,7 +388,7 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
             // Convert the property to lowercase if case-insensitive comparison is needed
             if (caseInsensitive && targetType == typeof(string))
             {
-                property = Expression.Call(property, nameof (string.ToLower), Type.EmptyTypes);
+                property = Expression.Call(property, StringToLowerMethod);
             }
 
             // For 'inlike' and 'ninlike' operations (pattern matching using 'Contains')
@@ -302,7 +398,7 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
                 var inValues = new HashSet<string>(values.Select(v => caseInsensitive ? v.ToLower() : v));
 
                 var containsExpressions = inValues.Select(value =>
-                                                              Expression.Call(property, typeof(string).GetMethod(nameof (string.Contains), [typeof(string)])!, Expression.Constant(value)) as Expression
+                                                              Expression.Call(property, StringContainsMethod, Expression.Constant(value)) as Expression
                                                          ).ToList();
 
                 if (!containsExpressions.Any())
@@ -320,7 +416,7 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
 
                 // For regular 'in' or 'nin' operations
                 var inList = Expression.Constant(inValues);
-                var containsMethod = typeof(HashSet<TProperty>).GetMethod(nameof (HashSet<TProperty>.Contains), [property.Type]);
+                var containsMethod = typeof(HashSet<TProperty>).GetMethod(nameof (HashSet<TProperty>.Contains), new[] { property.Type });
 
                 var containsExpression = Expression.Call(inList, containsMethod!, property);
                 return isNotIn ? Expression.Not(containsExpression) : containsExpression;

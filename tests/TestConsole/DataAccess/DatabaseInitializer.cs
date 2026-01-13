@@ -43,12 +43,28 @@ BEGIN
 END
 ";
 
+        var createDistricts = @"
+IF OBJECT_ID(N'dbo.Districts','U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Districts (
+        Id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        RowId UNIQUEIDENTIFIER NOT NULL,
+        Name NVARCHAR(MAX) NOT NULL,
+        Population INT NOT NULL,
+        CityId BIGINT NOT NULL
+    );
+    ALTER TABLE dbo.Districts
+    ADD CONSTRAINT FK_Districts_Cities_CityId FOREIGN KEY (CityId) REFERENCES dbo.Cities (Id);
+END
+";
+
         // Execute DDL. Open connection explicitly to avoid EF attempting to create DB or run migrations.
         await context.Database.OpenConnectionAsync();
         try
         {
             await context.Database.ExecuteSqlRawAsync(createCountries);
             await context.Database.ExecuteSqlRawAsync(createCities);
+            await context.Database.ExecuteSqlRawAsync(createDistricts);
         }
         finally
         {

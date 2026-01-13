@@ -47,7 +47,7 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
 
     public async Task<TEntity?> GetAsync(ISpecification<TEntity> specification, CancellationToken cancellationToken = default)
     {
-        var query = await _entity.ApplySpecification(specification, cancellationToken);
+        var query = _entity.ApplySpecification(specification);
         return await query.FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -62,7 +62,7 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
     public virtual async Task<bool> ExistsByAsync(ISpecification<TEntity> specification,
                                                   CancellationToken cancellationToken = default)
     {
-        var query = await _entity.ApplySpecification(specification, cancellationToken);
+        var query = _entity.ApplySpecification(specification);
         return await query.AnyAsync(specification.Criteria ?? (entity => true), cancellationToken);
     }
 
@@ -72,7 +72,7 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
     {
         sortable ??= new Sortable();
 
-        var query = await _entity.ApplySpecification(specification, cancellationToken);
+        var query = _entity.ApplySpecification(specification);
 
         query = sortable.ApplySorting(query);
 
@@ -83,7 +83,7 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
                                                                   Sortable? sortable = null,
                                                                   CancellationToken cancellationToken = default)
     {
-        IQueryable<TEntity> query = await _entity.ApplySpecification(specification, cancellationToken);
+        IQueryable<TEntity> query = _entity.ApplySpecification(specification);
 
         sortable ??= new Sortable();
 
@@ -166,7 +166,7 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
     {
         sortable ??= new Sortable();
 
-        var query = await _entity.ApplySpecification(specification, cancellationToken);
+        var query = _entity.ApplySpecification(specification);
 
         query = sortable.ApplySorting(query);
 
@@ -180,7 +180,7 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
     {
         sortable ??= new Sortable();
 
-        IQueryable<TEntity> query = await _entity.ApplySpecification(specification, cancellationToken);
+        IQueryable<TEntity> query = _entity.ApplySpecification(specification);
 
         IQueryable<TResult> newQuery;
         if (specification.ProjectionExpression is null)
@@ -336,7 +336,7 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
         try
         {
             // Apply any filtering if needed
-            var query = await _entity.ApplySpecification(specification, cancellationToken);
+            var query = _entity.ApplySpecification(specification);
 
             if (specification.ExecuteUpdateExpression is not null)
             {
@@ -364,7 +364,7 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
     {
         try
         {
-            var query = await _entity.ApplySpecification(specification, cancellationToken);
+            var query = _entity.ApplySpecification(specification);
 
             Action<UpdateSettersBuilder<TEntity>> updateExpression = ExpressionGenerator<TEntity>.BuildUpdateExpression(model);
             return await query.ExecuteUpdateAsync(updateExpression, cancellationToken);
@@ -443,7 +443,7 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
     public virtual async IAsyncEnumerable<TEntity> StreamAllAsync(ISpecification<TEntity> specification,
                                                                   [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var query = await _entity.ApplySpecification(specification, cancellationToken);
+        var query = _entity.ApplySpecification(specification);
 
         await foreach (var item in query.AsAsyncEnumerable().WithCancellation(cancellationToken))
         {
@@ -454,7 +454,7 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
     public virtual async IAsyncEnumerable<TResult> StreamAllAsync<TResult>(ISpecification<TEntity> specification,
                                                                            [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        IQueryable<TEntity> query = await _entity.ApplySpecification(specification, cancellationToken);
+        IQueryable<TEntity> query = _entity.ApplySpecification(specification);
 
         IQueryable<TResult> newQuery;
         if (specification.ProjectionExpression is null)

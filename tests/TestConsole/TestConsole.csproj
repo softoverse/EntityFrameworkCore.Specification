@@ -5,10 +5,11 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\Softoverse.EntityFrameworkCore.Specification\Softoverse.EntityFrameworkCore.Specification.csproj"/>
+        <ProjectReference Include="..\..\src\Softoverse.EntityFrameworkCore.Specification\Softoverse.EntityFrameworkCore.Specification.csproj" />
 <!--        <PackageReference Include="Softoverse.EntityFrameworkCore.Specification"/>-->
     </ItemGroup>
 

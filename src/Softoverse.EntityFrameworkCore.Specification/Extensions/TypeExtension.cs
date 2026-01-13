@@ -1,6 +1,6 @@
 ﻿namespace Softoverse.EntityFrameworkCore.Specification.Extensions;
 
-public static class TypeExtension
+internal static class TypeExtension
 {
     public static bool IsNumeric(this Type type)
     {
