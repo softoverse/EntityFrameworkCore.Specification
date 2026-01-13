@@ -62,7 +62,7 @@ public class ActivePremiumUsersSpec : Specification<User>
             .ThenInclude(o => o.OrderItems);
             
         // Ordering
-        AddOrderByDescending(u => u.CreatedAt);
+        OrderByDescending(u => u.CreatedAt);
         
         // Query options
         AsNoTracking = true;
@@ -122,10 +122,73 @@ spec.Include(u => u.Orders.Where(o => o.Status == OrderStatus.Shipped));
 ```
 
 ### Ordering
-Easily add sort logic to your specifications.
+The library supports fluent OrderBy and ThenBy methods for multi-level sorting, providing a chainable API similar to LINQ.
+
+#### Simple Ordering
 ```csharp
-spec.AddOrderBy(u => u.LastName);
-spec.AddOrderByDescending(u => u.CreatedAt);
+// Ascending order
+spec.OrderBy(u => u.LastName);
+// SQL: ORDER BY [u].[LastName]
+
+// Descending order
+spec.OrderByDescending(u => u.CreatedAt);
+// SQL: ORDER BY [u].[CreatedAt] DESC
+```
+
+#### Multi-Level Ordering with ThenBy
+Chain multiple ordering levels for complex sorting scenarios:
+```csharp
+// Order by multiple fields
+spec.OrderBy(u => u.IsActive)
+    .ThenByDescending(u => u.CreatedAt)
+    .ThenBy(u => u.LastName);
+// SQL: ORDER BY [u].[IsActive], [u].[CreatedAt] DESC, [u].[LastName]
+```
+
+#### Combining with Includes
+OrderBy can be seamlessly chained with Include operations:
+```csharp
+// Chain OrderBy after Include
+spec.Include(u => u.Orders)
+    .ThenInclude(o => o.Items)
+    .OrderByDescending(u => u.CreatedAt);
+
+// Or chain Include after OrderBy
+spec.OrderBy(u => u.Name)
+    .Include(u => u.Profile);
+```
+
+#### Real-World Examples
+```csharp
+// E-commerce: Sort products by category, then rating, then price
+spec.Criteria = p => p.InStock;
+spec.OrderBy(p => p.CategoryId)
+    .ThenByDescending(p => p.AverageRating)
+    .ThenBy(p => p.Price);
+
+// User management: Sort by department, last name, first name
+spec.OrderBy(u => u.Department)
+    .ThenBy(u => u.LastName)
+    .ThenBy(u => u.FirstName);
+
+// Blog: Featured posts first, then by date
+spec.OrderByDescending(p => p.IsFeatured)
+    .ThenByDescending(p => p.PublishedDate);
+```
+
+#### Important Notes
+- **Database-level sorting**: All ordering is applied at the SQL level, not in memory
+- **Performance**: Add database indexes on frequently ordered columns for optimal performance
+- **OrderBy clears previous ordering**: Calling `OrderBy()` or `OrderByDescending()` clears any previous ordering
+- **Use ThenBy for secondary sorts**: Always use `ThenBy()`/`ThenByDescending()` for additional sorting levels
+
+**Migration Note:** The old `AddOrderBy()` and `AddOrderByDescending()` methods are still supported but marked as obsolete. Migrate to the new fluent API:
+```csharp
+// ❌ Old (Obsolete)
+spec.AddOrderBy(u => u.Name);
+
+// ✅ New (Recommended)
+spec.OrderBy(u => u.Name);
 ```
 
 ### Projections
@@ -283,7 +346,7 @@ public class GetActiveUsersQuery : ISpecificationRequest<User>
         }
 
         spec.Include(u => u.Profile);
-        spec.AddOrderBy(u => u.Name);
+        spec.OrderBy(u => u.Name);
 
         return spec;
     }
@@ -322,8 +385,9 @@ The primary interface for defining specifications.
 - `Criteria`: The filter expression.
 - `AsNoTracking`: Boolean for tracking behavior.
 - `AsSplitQuery`: Boolean for query splitting behavior.
-- `OrderByExpression`: Primary sort expression.
-- `OrderByDescendingExpression`: Primary descending sort expression.
+- `OrderByExpression`: *(Obsolete)* Primary sort expression. Use `OrderBy()` method instead.
+- `OrderByDescendingExpression`: *(Obsolete)* Primary descending sort expression. Use `OrderByDescending()` method instead.
+- `OrderByExpressions`: List of ordering expressions with direction indicators for multi-level sorting.
 - `ProjectionExpression`: Expression for projecting to a different type.
 - `ExecuteUpdateExpression`: Action for bulk updates using `UpdateSettersBuilder`.
 - `ExecuteUpdateProperties`: List of property selectors for object-based bulk updates.
@@ -340,6 +404,11 @@ Base interface for specifications that might use a primary key.
 Enables fluent `ThenInclude` chaining.
 - `ThenInclude<TNextProperty>(expression)`: Chains a sub-property load.
 
+#### `IOrderableSpecification<TEntity, TProperty>`
+Enables fluent `ThenBy` and `ThenByDescending` chaining for multi-level sorting.
+- `ThenBy<TNextProperty>(keySelector)`: Chains an ascending sort on a property.
+- `ThenByDescending<TNextProperty>(keySelector)`: Chains a descending sort on a property.
+
 ### Classes
 
 #### `Specification<TEntity>`
@@ -351,8 +420,10 @@ The base implementation of `ISpecification<TEntity>`.
 - **Methods**:
     - `Include(expression)`: Adds an eager load.
     - `IncludeString(path)`: Adds a string-based eager load.
-    - `AddOrderBy(expression)`: Sets the ascending order.
-    - `AddOrderByDescending(expression)`: Sets the descending order.
+    - `OrderBy(keySelector)`: Sets ascending order and returns an `IOrderableSpecification` for chaining.
+    - `OrderByDescending(keySelector)`: Sets descending order and returns an `IOrderableSpecification` for chaining.
+    - `AddOrderBy(expression)`: *(Obsolete)* Sets the ascending order. Use `OrderBy()` instead.
+    - `AddOrderByDescending(expression)`: *(Obsolete)* Sets the descending order. Use `OrderByDescending()` instead.
     - `SetProjection(expression)`: Sets the selection projection.
     - `SetExecuteUpdateExpression(action)`: Sets the fluent bulk update logic.
     - `AddExecuteUpdateProperties(expression)`: Adds a property for bulk update.

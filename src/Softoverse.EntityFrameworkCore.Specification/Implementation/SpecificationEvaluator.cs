@@ -40,8 +40,36 @@ public static class SpecificationEvaluator
             queryable = queryable.Select(specification.ProjectionExpression).OfType<TEntity>();
         }
 
-        // Apply ordering
-        if (specification.OrderByExpression is not null)
+        // Apply ordering using the new OrderByExpressions collection
+        if (specification.OrderByExpressions.Any())
+        {
+            IOrderedQueryable<TEntity>? orderedQuery = null;
+            
+            for (int i = 0; i < specification.OrderByExpressions.Count; i++)
+            {
+                var (keySelector, isDescending) = specification.OrderByExpressions[i];
+                
+                if (i == 0)
+                {
+                    // First ordering - use OrderBy or OrderByDescending
+                    orderedQuery = isDescending
+                        ? queryable.OrderByDescending(keySelector)
+                        : queryable.OrderBy(keySelector);
+                }
+                else
+                {
+                    // Subsequent orderings - use ThenBy or ThenByDescending
+                    orderedQuery = isDescending
+                        ? orderedQuery!.ThenByDescending(keySelector)
+                        : orderedQuery!.ThenBy(keySelector);
+                }
+            }
+            
+            queryable = orderedQuery!;
+        }
+        // Fallback to legacy single OrderBy properties for backward compatibility
+#pragma warning disable CS0618 // Type or member is obsolete
+        else if (specification.OrderByExpression is not null)
         {
             queryable = queryable.OrderBy(specification.OrderByExpression);
         }
@@ -49,6 +77,7 @@ public static class SpecificationEvaluator
         {
             queryable = queryable.OrderByDescending(specification.OrderByDescendingExpression);
         }
+#pragma warning restore CS0618 // Type or member is obsolete
 
         // Apply split query if specified
         if (specification.AsSplitQuery)

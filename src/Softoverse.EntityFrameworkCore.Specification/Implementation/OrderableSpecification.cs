@@ -7,49 +7,53 @@ using Softoverse.EntityFrameworkCore.Specification.Abstraction;
 namespace Softoverse.EntityFrameworkCore.Specification.Implementation;
 
 /// <summary>
-/// Internal wrapper that enables fluent ThenInclude syntax with automatic type inference
+/// Internal wrapper that enables fluent ThenBy/ThenByDescending syntax with automatic type inference
 /// </summary>
-internal class IncludableSpecification<TEntity, TProperty> : IIncludableSpecification<TEntity, TProperty>
+internal class OrderableSpecification<TEntity, TProperty> : IOrderableSpecification<TEntity, TProperty>
     where TEntity : class
 {
     private readonly Specification<TEntity> _specification;
 
-    public IncludableSpecification(Specification<TEntity> specification)
+    public OrderableSpecification(Specification<TEntity> specification)
     {
         _specification = specification;
     }
 
     /// <summary>
-    /// Gets the underlying specification - used by extension methods
+    /// Gets the underlying specification - used by extension methods if needed
     /// </summary>
     public Specification<TEntity> GetSpecification() => _specification;
 
-    public IIncludableSpecification<TEntity, TNextProperty> ThenInclude<TNextProperty>(
-        Expression<Func<TProperty, TNextProperty>> navigationPropertyPath)
+    public IOrderableSpecification<TEntity, TNextProperty> ThenBy<TNextProperty>(
+        Expression<Func<TEntity, TNextProperty>> keySelector)
     {
-        _specification.AppendThenInclude(navigationPropertyPath);
-        return new IncludableSpecification<TEntity, TNextProperty>(_specification);
+        _specification.AppendThenBy(keySelector, isDescending: false);
+        return new OrderableSpecification<TEntity, TNextProperty>(_specification);
+    }
+
+    public IOrderableSpecification<TEntity, TNextProperty> ThenByDescending<TNextProperty>(
+        Expression<Func<TEntity, TNextProperty>> keySelector)
+    {
+        _specification.AppendThenBy(keySelector, isDescending: true);
+        return new OrderableSpecification<TEntity, TNextProperty>(_specification);
     }
 
     // Delegate all ISpecification<TEntity> members to the wrapped specification
     public bool AsSplitQuery
     {
         get => _specification.AsSplitQuery;
-
         set => _specification.AsSplitQuery = value;
     }
 
     public bool AsNoTracking
     {
         get => _specification.AsNoTracking;
-
         set => _specification.AsNoTracking = value;
     }
 
     public Expression<Func<TEntity, bool>>? Criteria
     {
         get => _specification.Criteria;
-
         set => _specification.Criteria = value;
     }
 
@@ -61,14 +65,12 @@ internal class IncludableSpecification<TEntity, TProperty> : IIncludableSpecific
     public Expression<Func<TEntity, object>>? OrderByExpression
     {
         get => _specification.OrderByExpression;
-
         set => _specification.OrderByExpression = value;
     }
 
     public Expression<Func<TEntity, object>>? OrderByDescendingExpression
     {
         get => _specification.OrderByDescendingExpression;
-
         set => _specification.OrderByDescendingExpression = value;
     }
 #pragma warning restore CS0618 // Type or member is obsolete
@@ -78,14 +80,12 @@ internal class IncludableSpecification<TEntity, TProperty> : IIncludableSpecific
     public Expression<Func<TEntity, object>>? ProjectionExpression
     {
         get => _specification.ProjectionExpression;
-
         set => _specification.ProjectionExpression = value;
     }
 
     public Action<UpdateSettersBuilder<TEntity>>? ExecuteUpdateExpression
     {
         get => _specification.ExecuteUpdateExpression;
-
         set => _specification.ExecuteUpdateExpression = value;
     }
 
@@ -94,7 +94,6 @@ internal class IncludableSpecification<TEntity, TProperty> : IIncludableSpecific
     public object? PrimaryKey
     {
         get => _specification.PrimaryKey;
-
         set => _specification.PrimaryKey = value;
     }
 
@@ -131,5 +130,4 @@ internal class IncludableSpecification<TEntity, TProperty> : IIncludableSpecific
     public IOrderableSpecification<TEntity, TNewProperty> OrderByDescending<TNewProperty>(Expression<Func<TEntity, TNewProperty>> keySelector)
         => _specification.OrderByDescending(keySelector);
 }
-
 

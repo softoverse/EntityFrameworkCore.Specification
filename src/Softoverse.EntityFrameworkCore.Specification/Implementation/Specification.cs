@@ -57,8 +57,14 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
     private string? _currentIncludePath;
     private Expression? _currentIncludeExpression;
 
+    [Obsolete("Use OrderBy() fluent method instead", false)]
     public Expression<Func<TEntity, object>>? OrderByExpression { get; set; }
+
+    [Obsolete("Use OrderByDescending() fluent method instead", false)]
     public Expression<Func<TEntity, object>>? OrderByDescendingExpression { get; set; }
+
+    internal List<(Expression<Func<TEntity, object>> KeySelector, bool IsDescending)> OrderByExpressions { get; } = [];
+    List<(Expression<Func<TEntity, object>> KeySelector, bool IsDescending)> ISpecification<TEntity>.OrderByExpressions => OrderByExpressions;
 
     public Expression<Func<TEntity, object>>? ProjectionExpression { get; set; }
 
@@ -83,9 +89,11 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
         return new IncludableSpecification<TEntity, object>(this);
     }
 
+#pragma warning disable CS0618 // Type or member is obsolete
     public void AddOrderBy(Expression<Func<TEntity, object>> orderByExpression) => OrderByExpression = orderByExpression;
 
     public void AddOrderByDescending(Expression<Func<TEntity, object>> orderByDescendingExpression) => OrderByDescendingExpression = orderByDescendingExpression;
+#pragma warning restore CS0618 // Type or member is obsolete
 
     public void SetProjection(Expression<Func<TEntity, object>> projectionExpression) => ProjectionExpression = projectionExpression;
 
@@ -124,6 +132,54 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
         IncludeActions.Add(query => query.Include(includeString));
         
         return new IncludableSpecification<TEntity, object>(this);
+    }
+
+    public IOrderableSpecification<TEntity, TProperty> OrderBy<TProperty>(Expression<Func<TEntity, TProperty>> keySelector)
+    {
+        // Convert to object expression for storage
+        var body = keySelector.Body;
+        if (body.Type != typeof(object))
+        {
+            body = Expression.Convert(body, typeof(object));
+        }
+        var converted = Expression.Lambda<Func<TEntity, object>>(body, keySelector.Parameters);
+        
+        // Clear any existing ordering and add new one
+        OrderByExpressions.Clear();
+        OrderByExpressions.Add((converted, false));
+        
+        return new OrderableSpecification<TEntity, TProperty>(this);
+    }
+
+    public IOrderableSpecification<TEntity, TProperty> OrderByDescending<TProperty>(Expression<Func<TEntity, TProperty>> keySelector)
+    {
+        // Convert to object expression for storage
+        var body = keySelector.Body;
+        if (body.Type != typeof(object))
+        {
+            body = Expression.Convert(body, typeof(object));
+        }
+        var converted = Expression.Lambda<Func<TEntity, object>>(body, keySelector.Parameters);
+        
+        // Clear any existing ordering and add new one
+        OrderByExpressions.Clear();
+        OrderByExpressions.Add((converted, true));
+        
+        return new OrderableSpecification<TEntity, TProperty>(this);
+    }
+
+    internal void AppendThenBy<TProperty>(Expression<Func<TEntity, TProperty>> keySelector, bool isDescending)
+    {
+        // Convert to object expression for storage
+        var body = keySelector.Body;
+        if (body.Type != typeof(object))
+        {
+            body = Expression.Convert(body, typeof(object));
+        }
+        var converted = Expression.Lambda<Func<TEntity, object>>(body, keySelector.Parameters);
+        
+        // Append to existing ordering
+        OrderByExpressions.Add((converted, isDescending));
     }
     
     internal void AppendThenInclude<TPreviousProperty, TProperty>(

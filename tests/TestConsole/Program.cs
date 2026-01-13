@@ -37,6 +37,13 @@ public class Program
         await TestCompareIncludeMethods();
         await TestImprovedInclude();
         
+        Console.WriteLine("\n========== Testing OrderBy & ThenBy Features ==========\n");
+        await TestSimpleOrderBy();
+        await TestOrderByDescending();
+        await TestThenBy();
+        await TestMultiLevelThenBy();
+        await TestMixedOrderByWithIncludes();
+        
         Console.WriteLine("\n========== Testing Update Operation ==========\n");
         await TestUpdateOperation();
     }
@@ -616,5 +623,156 @@ public class Program
         Console.WriteLine("are complex in EF Core and may require multiple queries or projections.");
         Console.WriteLine();
     }
+
+    #region OrderBy & ThenBy Tests
+
+    private static async Task TestSimpleOrderBy()
+    {
+        Console.WriteLine("========== Test: Simple OrderBy ==========");
+        
+        var spec = new Specification<Country>
+        {
+            AsNoTracking = true
+        };
+        
+        // Apply OrderBy using fluent method
+        spec.OrderBy(c => c.Name);
+        
+        var countries = await _countryRepository.GetAllAsync(spec);
+        
+        Console.WriteLine("Countries ordered by Name (ascending):");
+        foreach (var country in countries)
+        {
+            Console.WriteLine($"  {country.Name}");
+        }
+        Console.WriteLine();
+    }
+
+    private static async Task TestOrderByDescending()
+    {
+        Console.WriteLine("========== Test: OrderByDescending ==========");
+        
+        var spec = new Specification<Country>
+        {
+            AsNoTracking = true
+        };
+        
+        // Apply OrderByDescending using fluent method
+        spec.OrderByDescending(c => c.Name);
+        
+        var countries = await _countryRepository.GetAllAsync(spec);
+        
+        Console.WriteLine("Countries ordered by Name (descending):");
+        foreach (var country in countries)
+        {
+            Console.WriteLine($"  {country.Name}");
+        }
+        Console.WriteLine();
+    }
+
+    private static async Task TestThenBy()
+    {
+        Console.WriteLine("========== Test: OrderBy with ThenBy ==========");
+        
+        var spec = new Specification<City>
+        {
+            AsNoTracking = true
+        };
+        
+        // Apply OrderBy followed by ThenBy
+        spec.OrderBy(c => c.IsCapital)
+            .ThenBy(c => c.Name);
+        
+        var cities = await _cityRepository.GetAllAsync(spec);
+        
+        Console.WriteLine("Cities ordered by IsCapital, then by Name:");
+        foreach (var city in cities)
+        {
+            Console.WriteLine($"  {city.Name} (Capital: {city.IsCapital})");
+        }
+        Console.WriteLine();
+    }
+
+    private static async Task TestMultiLevelThenBy()
+    {
+        Console.WriteLine("========== Test: Multi-level ThenBy ==========");
+        
+        var spec = new Specification<City>
+        {
+            AsNoTracking = true
+        };
+        
+        // Apply OrderBy followed by multiple ThenBy
+        spec.OrderBy(c => c.CountryId)
+            .ThenByDescending(c => c.IsCapital)
+            .ThenBy(c => c.Name);
+        
+        var cities = await _cityRepository.GetAllAsync(spec);
+        
+        Console.WriteLine("Cities ordered by CountryId, then IsCapital (desc), then Name:");
+        foreach (var city in cities)
+        {
+            Console.WriteLine($"  Country {city.CountryId}: {city.Name} (Capital: {city.IsCapital})");
+        }
+        Console.WriteLine();
+    }
+
+    private static async Task TestMixedOrderByWithIncludes()
+    {
+        Console.WriteLine("========== Test: OrderBy with Include ==========");
+        
+        var spec = new Specification<Country>
+        {
+            AsNoTracking = true
+        };
+        
+        // Apply Include and OrderBy together
+        spec.Include(c => c.Cities)
+            .OrderBy(c => c.Name);
+        
+        var countries = await _countryRepository.GetAllAsync(spec);
+        
+        Console.WriteLine("Countries with Cities, ordered by Country Name:");
+        foreach (var country in countries)
+        {
+            Console.WriteLine($"  {country.Name}");
+            foreach (var city in country.Cities.OrderBy(c => c.Name))
+            {
+                Console.WriteLine($"    - {city.Name}");
+            }
+        }
+        Console.WriteLine();
+        
+        Console.WriteLine("========== Test: OrderBy with ThenInclude ==========");
+        
+        var spec2 = new Specification<Country>
+        {
+            AsNoTracking = true
+        };
+        
+        // Apply Include with ThenInclude and OrderBy
+        spec2.Include(c => c.Cities)
+             .ThenInclude(city => city.Districts)
+             .OrderByDescending(c => c.Name);
+        
+        var countries2 = await _countryRepository.GetAllAsync(spec2);
+        
+        Console.WriteLine("Countries with Cities and Districts, ordered by Country Name (desc):");
+        foreach (var country in countries2)
+        {
+            Console.WriteLine($"  {country.Name}");
+            foreach (var city in country.Cities.OrderBy(c => c.Name))
+            {
+                Console.WriteLine($"    City: {city.Name}");
+                foreach (var district in city.Districts.OrderBy(d => d.Name).Take(2))
+                {
+                    Console.WriteLine($"      District: {district.Name} (Pop: {district.Population:N0})");
+                }
+            }
+        }
+        Console.WriteLine();
+    }
+
+    #endregion
 }
 

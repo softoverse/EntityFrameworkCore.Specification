@@ -23,9 +23,18 @@ public interface ISpecification<TEntity> : ISpecificationForPrimaryKey where TEn
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public List<Func<IQueryable<TEntity>, IQueryable<TEntity>>> IncludeActions { get; }
 
+    [Obsolete("Use OrderBy() fluent method instead", false)]
     public Expression<Func<TEntity, object>>? OrderByExpression { get; }
 
+    [Obsolete("Use OrderByDescending() fluent method instead", false)]
     public Expression<Func<TEntity, object>>? OrderByDescendingExpression { get; }
+
+    /// <summary>
+    /// List of ordering expressions with direction indicators (true = descending, false = ascending)
+    /// </summary>
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    public List<(Expression<Func<TEntity, object>> KeySelector, bool IsDescending)> OrderByExpressions { get; }
+
     public Expression<Func<TEntity, object>>? ProjectionExpression { get; }
     public Action<UpdateSettersBuilder<TEntity>>? ExecuteUpdateExpression { get; }
 
@@ -50,4 +59,8 @@ public interface ISpecification<TEntity> : ISpecificationForPrimaryKey where TEn
     IIncludableSpecification<TEntity, TProperty> Include<TProperty>(Expression<Func<TEntity, TProperty>> includeExpression);
 
     IIncludableSpecification<TEntity, object> IncludeString(string includeString);
+
+    IOrderableSpecification<TEntity, TProperty> OrderBy<TProperty>(Expression<Func<TEntity, TProperty>> keySelector);
+
+    IOrderableSpecification<TEntity, TProperty> OrderByDescending<TProperty>(Expression<Func<TEntity, TProperty>> keySelector);
 }
