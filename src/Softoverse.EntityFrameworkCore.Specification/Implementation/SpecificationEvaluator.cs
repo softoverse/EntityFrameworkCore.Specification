@@ -90,11 +90,11 @@ public static class SpecificationEvaluator
 
     public static IQueryable<TEntity> ApplySpecification<TEntity>(this DbSet<TEntity> query, ISpecification<TEntity> specification) where TEntity : class
     {
-        return ApplySpecification(query.AsQueryable(), specification);
+        return query.AsQueryable().ApplySpecification(specification);
     }
 
     public static IQueryable<TEntity> ApplySpecification<TEntity>(this DbContext dbContext, ISpecification<TEntity> specification) where TEntity : class
     {
-        return ApplySpecification(dbContext.Set<TEntity>(), specification);
+        return dbContext.Set<TEntity>().ApplySpecification(specification);
     }
 }
