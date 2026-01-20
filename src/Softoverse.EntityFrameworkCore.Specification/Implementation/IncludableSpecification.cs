@@ -31,6 +31,13 @@ internal class IncludableSpecification<TEntity, TProperty> : IIncludableSpecific
         return new IncludableSpecification<TEntity, TNextProperty>(_specification);
     }
 
+    public IIncludableSpecification<TEntity, TNextProperty> ThenInclude<TPreviousProperty, TNextProperty>(
+        Expression<Func<TPreviousProperty, TNextProperty>> navigationPropertyPath)
+    {
+        _specification.AppendThenInclude(navigationPropertyPath);
+        return new IncludableSpecification<TEntity, TNextProperty>(_specification);
+    }
+
     // Delegate all ISpecification<TEntity> members to the wrapped specification
     public bool AsSplitQuery
     {
