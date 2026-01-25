@@ -7,6 +7,7 @@
         <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
         <RootNamespace>Softoverse.EntityFrameworkCore.Specification</RootNamespace>
 
+        <PackageId>Softoverse.EntityFrameworkCore.Specification</PackageId>
         <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
         <Title>Specification Pattern for Entity Framework Core</Title>
         <Authors>Abir Mahmud</Authors>
@@ -18,6 +19,8 @@
         <IncludeSymbols>True</IncludeSymbols>
         <SymbolPackageFormat>symbols.nupkg</SymbolPackageFormat>
         <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+        <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+        <PackageOutputPath>../../packages/</PackageOutputPath>
 
         <Version>10.2.0</Version>
 
