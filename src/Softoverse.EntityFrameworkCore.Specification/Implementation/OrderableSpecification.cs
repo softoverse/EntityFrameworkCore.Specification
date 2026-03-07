@@ -1,4 +1,4 @@
-﻿using System.Linq.Expressions;
+﻿﻿using System.Linq.Expressions;
 
 using Microsoft.EntityFrameworkCore.Query;
 
@@ -129,5 +129,32 @@ internal class OrderableSpecification<TEntity, TProperty> : IOrderableSpecificat
 
     public IOrderableSpecification<TEntity, TNewProperty> OrderByDescending<TNewProperty>(Expression<Func<TEntity, TNewProperty>> keySelector)
         => _specification.OrderByDescending(keySelector);
+
+    public Expression<Func<TEntity, bool>>? GetQuerySpecification()
+        => _specification.GetQuerySpecification();
+
+    public void SetQuerySpecification(Expression<Func<TEntity, bool>>? criteria)
+        => _specification.SetQuerySpecification(criteria);
+
+    public List<(Expression<Func<TEntity, object>> KeySelector, bool IsDescending)> GetOrderBySpecifications()
+        => _specification.GetOrderBySpecifications();
+
+    public void SetOrderBySpecifications(List<(Expression<Func<TEntity, object>> KeySelector, bool IsDescending)> orderBySpecifications)
+        => _specification.SetOrderBySpecifications(orderBySpecifications);
+
+    public void ClearOrderBySpecifications()
+        => _specification.ClearOrderBySpecifications();
+
+    public (List<Expression<Func<TEntity, object>>> IncludeExpressions, List<string> IncludeStrings, List<Func<IQueryable<TEntity>, IQueryable<TEntity>>> IncludeActions) GetIncludeSpecifications()
+        => _specification.GetIncludeSpecifications();
+
+    public void SetIncludeSpecifications(
+        List<Expression<Func<TEntity, object>>> includeExpressions,
+        List<string> includeStrings,
+        List<Func<IQueryable<TEntity>, IQueryable<TEntity>>> includeActions)
+        => _specification.SetIncludeSpecifications(includeExpressions, includeStrings, includeActions);
+
+    public void ClearIncludeSpecifications()
+        => _specification.ClearIncludeSpecifications();
 }
 

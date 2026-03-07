@@ -89,11 +89,11 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
         return new IncludableSpecification<TEntity, object>(this);
     }
 
-#pragma warning disable CS0618 // Type or member is obsolete
+    [Obsolete("Use OrderBy instead", false)]
     public void AddOrderBy(Expression<Func<TEntity, object>> orderByExpression) => OrderByExpression = orderByExpression;
 
+    [Obsolete("Use OrderByDescending instead", false)]
     public void AddOrderByDescending(Expression<Func<TEntity, object>> orderByDescendingExpression) => OrderByDescendingExpression = orderByDescendingExpression;
-#pragma warning restore CS0618 // Type or member is obsolete
 
     public void SetProjection(Expression<Func<TEntity, object>> projectionExpression) => ProjectionExpression = projectionExpression;
 
@@ -168,6 +168,58 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
         return new OrderableSpecification<TEntity, TProperty>(this);
     }
 
+    #region Get/Set Specification Parts
+
+    /// <inheritdoc />
+    public Expression<Func<TEntity, bool>>? GetQuerySpecification() => Criteria;
+
+    /// <inheritdoc />
+    public void SetQuerySpecification(Expression<Func<TEntity, bool>>? criteria) => Criteria = criteria;
+
+    /// <inheritdoc />
+    public List<(Expression<Func<TEntity, object>> KeySelector, bool IsDescending)> GetOrderBySpecifications()
+        => new(OrderByExpressions);
+
+    /// <inheritdoc />
+    public void SetOrderBySpecifications(List<(Expression<Func<TEntity, object>> KeySelector, bool IsDescending)> orderBySpecifications)
+    {
+        OrderByExpressions.Clear();
+        OrderByExpressions.AddRange(orderBySpecifications);
+    }
+
+    /// <inheritdoc />
+    public void ClearOrderBySpecifications() => OrderByExpressions.Clear();
+
+    /// <inheritdoc />
+    public (List<Expression<Func<TEntity, object>>> IncludeExpressions, List<string> IncludeStrings, List<Func<IQueryable<TEntity>, IQueryable<TEntity>>> IncludeActions) GetIncludeSpecifications()
+        => (new(IncludeExpressions), new(IncludeStrings), new(IncludeActions));
+
+    /// <inheritdoc />
+    public void SetIncludeSpecifications(
+        List<Expression<Func<TEntity, object>>> includeExpressions,
+        List<string> includeStrings,
+        List<Func<IQueryable<TEntity>, IQueryable<TEntity>>> includeActions)
+    {
+        IncludeExpressions.Clear();
+        IncludeExpressions.AddRange(includeExpressions);
+
+        IncludeStrings.Clear();
+        IncludeStrings.AddRange(includeStrings);
+
+        IncludeActions.Clear();
+        IncludeActions.AddRange(includeActions);
+    }
+
+    /// <inheritdoc />
+    public void ClearIncludeSpecifications()
+    {
+        IncludeExpressions.Clear();
+        IncludeStrings.Clear();
+        IncludeActions.Clear();
+    }
+
+    #endregion
+
     internal void AppendThenBy<TProperty>(Expression<Func<TEntity, TProperty>> keySelector, bool isDescending)
     {
         // Convert to object expression for storage
@@ -213,10 +265,10 @@ public class Specification<TEntity> : ISpecification<TEntity> where TEntity : cl
         _currentIncludeExpression = navigationPropertyPath;
     }
 
-    internal static Expression<Func<TEntity, bool>> ToConditionalExpressionInternal<TProperty>(Expression<Func<TEntity, TProperty>> propertySelector,
-                                                                                               object value,
-                                                                                               Operation defaultOperation,
-                                                                                               Expression<Func<TEntity, bool>>? defaultExpression = null)
+    private static Expression<Func<TEntity, bool>> ToConditionalExpressionInternal<TProperty>(Expression<Func<TEntity, TProperty>> propertySelector,
+                                                                                              object value,
+                                                                                              Operation defaultOperation,
+                                                                                              Expression<Func<TEntity, bool>>? defaultExpression = null)
     {
         var targetType = typeof(TProperty);
         var underlyingType = Nullable.GetUnderlyingType(targetType) ?? targetType;

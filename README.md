@@ -19,6 +19,7 @@ A powerful, lightweight implementation of the Specification Pattern for Entity F
     - [Smart Filtering (ToConditionalExpressionInternal)](#smart-filtering-toconditionalexpressioninternal)
     - [Bulk Updates (ExecuteUpdate)](#bulk-updates-executeupdate)
     - [Expression Combiner](#expression-combiner)
+    - [Cloning & Modifying Specifications](#cloning--modifying-specifications)
 - [Repository Integration](#repository-integration)
 - [CQRS Integration](#cqrs-integration)
 - [Full API Reference](#full-api-reference)
@@ -286,6 +287,95 @@ var combined = criteria1.And(criteria2);
 var either = criteria1.Or(criteria2);
 ```
 
+### Cloning & Modifying Specifications
+The library provides **get** and **set** methods for the three core parts of a specification — **query (criteria)**, **ordering**, and **includes** — so you can clone a specification and modify individual parts without affecting the original.
+
+#### Getting Specification Parts
+```csharp
+var spec = new Specification<User>();
+spec.Criteria = u => u.IsActive;
+spec.Include(u => u.Profile);
+spec.OrderBy(u => u.Name).ThenByDescending(u => u.CreatedAt);
+
+// Get query specification (criteria)
+Expression<Func<User, bool>>? criteria = spec.GetQuerySpecification();
+
+// Get order-by specifications (returns a copy)
+var ordering = spec.GetOrderBySpecifications();
+
+// Get include specifications (returns copies of all three lists)
+var (includeExpressions, includeStrings, includeActions) = spec.GetIncludeSpecifications();
+```
+
+#### Setting Specification Parts
+```csharp
+// Replace the query criteria
+spec.SetQuerySpecification(u => u.Age > 25);
+
+// Replace the ordering
+spec.SetOrderBySpecifications(new List<(Expression<Func<User, object>>, bool)>
+{
+    (u => u.Email, false),     // ascending
+    (u => u.CreatedAt, true)   // descending
+});
+
+// Replace the includes
+spec.SetIncludeSpecifications(includeExpressions, includeStrings, includeActions);
+```
+
+#### Clearing Specification Parts
+```csharp
+// Clear query criteria
+spec.SetQuerySpecification(null);
+
+// Clear all ordering
+spec.ClearOrderBySpecifications();
+
+// Clear all includes
+spec.ClearIncludeSpecifications();
+```
+
+#### Cloning a Specification
+A common scenario is cloning a specification and modifying only one part:
+```csharp
+// Original specification
+var baseSpec = new Specification<User>
+{
+    Criteria = u => u.IsActive,
+    AsNoTracking = true
+};
+baseSpec.Include(u => u.Profile);
+baseSpec.Include(u => u.Orders);
+baseSpec.OrderBy(u => u.Name);
+
+// Clone and modify ordering only
+var sortedByDate = new Specification<User>
+{
+    Criteria = baseSpec.GetQuerySpecification(),
+    AsNoTracking = baseSpec.AsNoTracking,
+    AsSplitQuery = baseSpec.AsSplitQuery
+};
+var includes = baseSpec.GetIncludeSpecifications();
+sortedByDate.SetIncludeSpecifications(includes.IncludeExpressions, includes.IncludeStrings, includes.IncludeActions);
+sortedByDate.OrderByDescending(u => u.CreatedAt);
+
+// Clone and modify criteria only
+var premiumUsers = new Specification<User>
+{
+    AsNoTracking = baseSpec.AsNoTracking,
+    AsSplitQuery = baseSpec.AsSplitQuery
+};
+premiumUsers.SetQuerySpecification(u => u.IsActive && u.IsPremium);
+premiumUsers.SetOrderBySpecifications(baseSpec.GetOrderBySpecifications());
+var baseIncludes = baseSpec.GetIncludeSpecifications();
+premiumUsers.SetIncludeSpecifications(baseIncludes.IncludeExpressions, baseIncludes.IncludeStrings, baseIncludes.IncludeActions);
+```
+
+#### Important Notes
+- **Copy semantics**: `GetOrderBySpecifications()` and `GetIncludeSpecifications()` return **copies** of the internal lists. Mutating the returned lists does not affect the original specification.
+- **Set replaces**: `SetOrderBySpecifications()` and `SetIncludeSpecifications()` **clear** existing data before applying the new lists.
+- **Thread safety**: These methods are not thread-safe. Do not share a `Specification` across threads without synchronization.
+
 ---
 
 ## Repository Integration
@@ -391,6 +481,14 @@ The primary interface for defining specifications.
 - `ProjectionExpression`: Expression for projecting to a different type.
 - `ExecuteUpdateExpression`: Action for bulk updates using `UpdateSettersBuilder`.
 - `ExecuteUpdateProperties`: List of property selectors for object-based bulk updates.
+- `GetQuerySpecification()`: Returns the current criteria expression (or `null`).
+- `SetQuerySpecification(criteria)`: Replaces the criteria expression (pass `null` to clear).
+- `GetOrderBySpecifications()`: Returns a copy of the current order-by expressions list.
+- `SetOrderBySpecifications(list)`: Replaces all order-by expressions with the provided list.
+- `ClearOrderBySpecifications()`: Clears all order-by expressions.
+- `GetIncludeSpecifications()`: Returns copies of include expressions, strings, and actions.
+- `SetIncludeSpecifications(expressions, strings, actions)`: Replaces all include specifications.
+- `ClearIncludeSpecifications()`: Clears all include specifications.
 
 #### `ISpecificationRequest<TEntity>`
 Used for bridging Query objects (CQRS) with Specifications.
@@ -428,6 +526,14 @@ The base implementation of `ISpecification<TEntity>`.
     - `SetExecuteUpdateExpression(action)`: Sets the fluent bulk update logic.
     - `AddExecuteUpdateProperties(expression)`: Adds a property for bulk update.
     - `ToConditionalExpression(...)`: Static helper to generate expressions from values/operators.
+    - `GetQuerySpecification()`: Returns the current `Criteria` expression.
+    - `SetQuerySpecification(criteria)`: Replaces the `Criteria` expression.
+    - `GetOrderBySpecifications()`: Returns a copy of the order-by expressions list.
+    - `SetOrderBySpecifications(list)`: Replaces all order-by expressions.
+    - `ClearOrderBySpecifications()`: Clears all order-by expressions.
+    - `GetIncludeSpecifications()`: Returns copies of include expressions, strings, and actions.
+    - `SetIncludeSpecifications(expressions, strings, actions)`: Replaces all include specifications.
+    - `ClearIncludeSpecifications()`: Clears all include specifications.
 
 #### `ExpressionGenerator<TEntity>` (Static)
 Helper for generating complex expressions dynamically.

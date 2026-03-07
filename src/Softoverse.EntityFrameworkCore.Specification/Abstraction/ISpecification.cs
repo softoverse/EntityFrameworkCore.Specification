@@ -1,4 +1,4 @@
-﻿using System.Linq.Expressions;
+﻿﻿using System.Linq.Expressions;
 
 using Microsoft.EntityFrameworkCore.Query;
 
@@ -63,4 +63,57 @@ public interface ISpecification<TEntity> : ISpecificationForPrimaryKey where TEn
     IOrderableSpecification<TEntity, TProperty> OrderBy<TProperty>(Expression<Func<TEntity, TProperty>> keySelector);
 
     IOrderableSpecification<TEntity, TProperty> OrderByDescending<TProperty>(Expression<Func<TEntity, TProperty>> keySelector);
+
+    #region Get/Set Specification Parts (for cloning and modification)
+
+    /// <summary>
+    /// Gets the current query specification (Criteria) expression.
+    /// Returns the filter expression or null if no criteria is set.
+    /// </summary>
+    Expression<Func<TEntity, bool>>? GetQuerySpecification();
+
+    /// <summary>
+    /// Sets (replaces) the query specification (Criteria) expression.
+    /// Pass null to clear the criteria.
+    /// </summary>
+    void SetQuerySpecification(Expression<Func<TEntity, bool>>? criteria);
+
+    /// <summary>
+    /// Gets a copy of the current order-by specifications.
+    /// Returns a new list containing the ordering expressions and their direction indicators.
+    /// </summary>
+    List<(Expression<Func<TEntity, object>> KeySelector, bool IsDescending)> GetOrderBySpecifications();
+
+    /// <summary>
+    /// Sets (replaces) the order-by specifications with the provided list.
+    /// Clears any existing ordering and applies the new list.
+    /// </summary>
+    void SetOrderBySpecifications(List<(Expression<Func<TEntity, object>> KeySelector, bool IsDescending)> orderBySpecifications);
+
+    /// <summary>
+    /// Clears all order-by specifications.
+    /// </summary>
+    void ClearOrderBySpecifications();
+
+    /// <summary>
+    /// Gets a copy of the current include specifications.
+    /// Returns a tuple containing copies of IncludeExpressions, IncludeStrings, and IncludeActions lists.
+    /// </summary>
+    (List<Expression<Func<TEntity, object>>> IncludeExpressions, List<string> IncludeStrings, List<Func<IQueryable<TEntity>, IQueryable<TEntity>>> IncludeActions) GetIncludeSpecifications();
+
+    /// <summary>
+    /// Sets (replaces) the include specifications with the provided lists.
+    /// Clears any existing includes and applies the new lists.
+    /// </summary>
+    void SetIncludeSpecifications(
+        List<Expression<Func<TEntity, object>>> includeExpressions,
+        List<string> includeStrings,
+        List<Func<IQueryable<TEntity>, IQueryable<TEntity>>> includeActions);
+
+    /// <summary>
+    /// Clears all include specifications (expressions, strings, and actions).
+    /// </summary>
+    void ClearIncludeSpecifications();
+
+    #endregion
 }

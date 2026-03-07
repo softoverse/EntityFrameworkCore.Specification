@@ -1,4 +1,4 @@
-﻿using System.Linq.Expressions;
+﻿﻿using System.Linq.Expressions;
 
 namespace Softoverse.EntityFrameworkCore.Specification.Helpers;
 
@@ -141,11 +141,20 @@ internal static class ExpressionCombiner
 
     public static Expression<Func<TEntity, bool>> CombineWithAnd<TEntity>(IEnumerable<Func<TEntity, bool>> predicates)
     {
-        Func<TEntity, bool> combined = null!;
+        Func<TEntity, bool>? combined = null;
 
         foreach (var predicate in predicates)
         {
-            combined = combined == null ? predicate : (x => combined(x) && predicate(x));
+            if (combined == null)
+            {
+                combined = predicate;
+            }
+            else
+            {
+                var left = combined;
+                var right = predicate;
+                combined = x => left(x) && right(x);
+            }
         }
 
         return combined == null ? True<TEntity>() : x => combined(x);
@@ -153,11 +162,20 @@ internal static class ExpressionCombiner
 
     public static Expression<Func<TEntity, bool>> CombineWithOr<TEntity>(IEnumerable<Func<TEntity, bool>> predicates)
     {
-        Func<TEntity, bool> combined = null!;
+        Func<TEntity, bool>? combined = null;
 
         foreach (var predicate in predicates)
         {
-            combined = combined == null ? predicate : (x => combined(x) || predicate(x));
+            if (combined == null)
+            {
+                combined = predicate;
+            }
+            else
+            {
+                var left = combined;
+                var right = predicate;
+                combined = x => left(x) || right(x);
+            }
         }
 
         return combined == null ? True<TEntity>() : x => combined(x);
@@ -165,11 +183,20 @@ internal static class ExpressionCombiner
 
     public static Expression<Func<TEntity, bool>> CombineWithNot<TEntity>(IEnumerable<Func<TEntity, bool>> predicates)
     {
-        Func<TEntity, bool> combined = null!;
+        Func<TEntity, bool>? combined = null;
 
         foreach (var predicate in predicates)
         {
-            combined = combined == null ? predicate : (x => combined(x) && !predicate(x));
+            if (combined == null)
+            {
+                combined = predicate;
+            }
+            else
+            {
+                var left = combined;
+                var right = predicate;
+                combined = x => left(x) && !right(x);
+            }
         }
 
         return combined == null ? True<TEntity>() : x => combined(x);

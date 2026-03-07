@@ -11,5 +11,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/Benchmark/Benchmark.csproj" />
     <Project Path="tests/TestConsole/TestConsole.csproj" />
+    <Project Path="tests/Softoverse.EntityFrameworkCore.Specification.Tests/Softoverse.EntityFrameworkCore.Specification.Tests.csproj" />
   </Folder>
 </Solution>
