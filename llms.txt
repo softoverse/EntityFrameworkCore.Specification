@@ -1,0 +1,17 @@
+# Softoverse.EntityFrameworkCore.Specification
+
+> A Specification Pattern library for Entity Framework Core (.NET 6+). Provides a fluent API for composing and reusing EF Core queries through `ISpecification<TEntity>` — covering filtering, eager loading, ordering, projections, bulk updates, and dynamic expression generation.
+
+- **NuGet**: `Softoverse.EntityFrameworkCore.Specification`
+- **License**: Apache 2.0
+- **Compatibility**: .NET 6.0+, Entity Framework Core 6.0+
+
+## Docs
+
+- [Full API Reference](https://raw.githubusercontent.com/softoverse/EntityFrameworkCore.Specification/main/llms-full.txt): Complete LLM reference — all classes, interfaces, methods, enums, and usage examples in one file.
+- [README](https://raw.githubusercontent.com/softoverse/EntityFrameworkCore.Specification/main/README.md): Getting started guide, installation, and overview of features.
+
+## Optional
+
+- [NuGet Package](https://www.nuget.org/packages/Softoverse.EntityFrameworkCore.Specification): Package page with version history and release notes.
+- [GitHub Repository](https://github.com/softoverse/EntityFrameworkCore.Specification): Source code, issues, and contribution guidelines.

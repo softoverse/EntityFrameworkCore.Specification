@@ -1,9 +1,10 @@
 <Solution>
-  <Folder Name="/Solution Items/">
+  <Folder Name="/.SolutionItems/">
     <File Path=".editorconfig" />
     <File Path=".gitignore" />
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />
+    <File Path="llms-full.txt" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Softoverse.EntityFrameworkCore.Specification/Softoverse.EntityFrameworkCore.Specification.csproj" />

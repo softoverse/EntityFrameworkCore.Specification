@@ -1,0 +1,652 @@
+﻿# Softoverse.EntityFrameworkCore.Specification — Full LLM Reference
+
+> Complete API reference and usage guide for `Softoverse.EntityFrameworkCore.Specification`, a Specification Pattern library for Entity Framework Core.
+
+---
+
+## Package Information
+
+- **NuGet ID**: `Softoverse.EntityFrameworkCore.Specification`
+- **Namespace root**: `Softoverse.EntityFrameworkCore.Specification`
+  - Abstractions: `Softoverse.EntityFrameworkCore.Specification.Abstraction`
+  - Implementations: `Softoverse.EntityFrameworkCore.Specification.Implementation`
+- **Compatibility**: .NET 6.0+, Entity Framework Core 6.0+
+- **License**: Apache 2.0
+
+---
+
+## Installation
+
+```powershell
+# NuGet Package Manager Console
+Install-Package Softoverse.EntityFrameworkCore.Specification
+```
+
+```sh
+# .NET CLI
+dotnet add package Softoverse.EntityFrameworkCore.Specification
+```
+
+---
+
+## Quick Start
+
+### 1. Define a Specification
+
+```csharp
+public class ActivePremiumUsersSpec : Specification<User>
+{
+    public ActivePremiumUsersSpec()
+    {
+        Criteria = u => u.IsActive && u.IsPremium;
+
+        // Eager load related data
+        Include(u => u.Profile);
+        Include(u => u.Orders)
+            .ThenInclude(o => o.OrderItems);
+
+        // Multi-level ordering
+        OrderByDescending(u => u.CreatedAt);
+
+        // Query options
+        AsNoTracking = true;
+    }
+}
+```
+
+### 2. Apply It
+
+```csharp
+// Works on IQueryable<T>, DbSet<T>, or DbContext
+var users = await _context.Users
+    .ApplySpecification(new ActivePremiumUsersSpec())
+    .ToListAsync();
+```
+
+---
+
+## Core Features
+
+### Filtering (Criteria)
+
+The `Criteria` property defines the `WHERE` clause.
+
+```csharp
+// Inline
+var spec = new Specification<User> { Criteria = u => u.Age > 18 };
+
+// Constructor with combined expressions
+var spec = new Specification<User>(
+    [u => u.IsActive, u => u.Email.Contains("@gmail.com")],
+    CombineType.And
+);
+```
+
+### Includes (Eager Loading)
+
+#### Expression-based (type-safe, supports ThenInclude)
+
+```csharp
+spec.Include(u => u.Orders)
+    .ThenInclude(o => o.Items);
+```
+
+#### String-based
+
+```csharp
+spec.IncludeString("Orders.Items");
+```
+
+#### Filtered Includes (EF Core 5+)
+
+```csharp
+spec.Include(u => u.Orders.Where(o => o.Status == OrderStatus.Shipped));
+```
+
+### Ordering
+
+All ordering is applied at the SQL level (not in memory).
+
+#### Simple ordering
+
+```csharp
+spec.OrderBy(u => u.LastName);
+// SQL: ORDER BY [u].[LastName]
+
+spec.OrderByDescending(u => u.CreatedAt);
+// SQL: ORDER BY [u].[CreatedAt] DESC
+```
+
+#### Multi-level ordering with ThenBy
+
+```csharp
+spec.OrderBy(u => u.IsActive)
+    .ThenByDescending(u => u.CreatedAt)
+    .ThenBy(u => u.LastName);
+// SQL: ORDER BY [u].[IsActive], [u].[CreatedAt] DESC, [u].[LastName]
+```
+
+#### Chaining with includes
+
+```csharp
+// OrderBy after Include
+spec.Include(u => u.Orders)
+    .ThenInclude(o => o.Items)
+    .OrderByDescending(u => u.CreatedAt);
+
+// Include after OrderBy
+spec.OrderBy(u => u.Name)
+    .Include(u => u.Profile);
+```
+
+#### Real-world examples
+
+```csharp
+// E-commerce: products
+spec.Criteria = p => p.InStock;
+spec.OrderBy(p => p.CategoryId)
+    .ThenByDescending(p => p.AverageRating)
+    .ThenBy(p => p.Price);
+
+// User management
+spec.OrderBy(u => u.Department)
+    .ThenBy(u => u.LastName)
+    .ThenBy(u => u.FirstName);
+
+// Blog: featured first, then by date
+spec.OrderByDescending(p => p.IsFeatured)
+    .ThenByDescending(p => p.PublishedDate);
+```
+
+**Note**: `OrderBy()` / `OrderByDescending()` clears any prior ordering. Use `ThenBy()` / `ThenByDescending()` for additional levels.
+
+### Projections
+
+```csharp
+spec.SetProjection(u => new { u.Id, u.FullName });
+```
+
+### No-Tracking & Split Queries
+
+```csharp
+spec.AsNoTracking = true;   // No change tracking (read-only)
+spec.AsSplitQuery = true;   // Split multi-collection includes into separate SQL queries
+```
+
+---
+
+## Advanced Features
+
+### Dynamic Expression Generation
+
+`ToConditionalExpression` is a static method on `Specification<TEntity>` that builds filter expressions from a value and an operator enum.
+
+```csharp
+// u => u.Age > 25
+var ageExp = Specification<User>.ToConditionalExpression(
+    u => u.Age,
+    25,
+    CompareOperation.GreaterThan
+);
+
+// u => u.Name == "John"
+var nameExp = Specification<User>.ToConditionalExpression(
+    u => u.Name,
+    "John",
+    EqualOperation.Equal
+);
+```
+
+### Smart Filtering with String Operators
+
+`ToConditionalExpression` also accepts a **string pattern** with a prefix operator. This is especially useful for mapping API query parameters to expressions.
+
+#### Supported Operator Prefixes
+
+| Prefix           | Meaning                              | Example input       |
+|------------------|--------------------------------------|---------------------|
+| `eq:`            | Equal                                | `eq:John`           |
+| `ne:`            | Not Equal                            | `ne:John`           |
+| `gt:`            | Greater Than                         | `gt:18`             |
+| `gte:`           | Greater Than or Equal                | `gte:18`            |
+| `lt:`            | Less Than                            | `lt:18`             |
+| `lte:`           | Less Than or Equal                   | `lte:18`            |
+| `eqci:`          | Equal (case-insensitive)             | `eqci:john`         |
+| `like:`          | Contains                             | `like:jo`           |
+| `likeci:`        | Contains (case-insensitive)          | `likeci:JO`         |
+| `range:`         | Inclusive range (two values)         | `range:18,30`       |
+| `in:`            | In list                              | `in:1,2,3`          |
+| `nin:`           | Not in list                          | `nin:1,2,3`         |
+| `inci:`          | In list (case-insensitive)           | `inci:a,b`          |
+| `ninci:`         | Not in list (case-insensitive)       | `ninci:c,d`         |
+| `inlike:`        | In list (pattern match)              | `inlike:a,b`        |
+| `ninlike:`       | Not in list (pattern match)          | `ninlike:x,y`       |
+| `inlikeci:`      | In list (case-insensitive pattern)   | `inlikeci:A,B`      |
+| `ninlikeci:`     | Not in list (case-insensitive pattern)| `ninlikeci:C,D`    |
+
+#### Usage
+
+```csharp
+string ageFilter      = "gt:18";
+string nameFilter     = "like:John";
+string categoryFilter = "in:Electronics,Books";
+
+var spec = new Specification<User>();
+spec.Criteria = Specification<User>.ToConditionalExpression(u => u.Age, ageFilter);
+spec.Criteria = spec.Criteria.And(Specification<User>.ToConditionalExpression(u => u.Name, nameFilter));
+spec.Criteria = spec.Criteria.And(Specification<User>.ToConditionalExpression(u => u.Category, categoryFilter));
+```
+
+### Bulk Updates (ExecuteUpdate)
+
+#### Option 1: Property selectors + model object
+
+```csharp
+var spec = new Specification<User>
+{
+    Criteria = u => u.Id == 1,
+    ExecuteUpdateProperties = [u => u.Name, u => u.Email]
+};
+await context.Users.ExecuteUpdateAsync(spec, userObject);
+```
+
+#### Option 2: Fluent SetProperty
+
+```csharp
+spec.SetExecuteUpdateExpression(setters => setters
+    .SetProperty(u => u.IsActive, true)
+    .SetProperty(u => u.LastLogin, DateTime.UtcNow));
+```
+
+### Expression Combiner (ExpressionBuilder)
+
+Extension methods on `Expression<Func<TEntity, bool>>`:
+
+```csharp
+Expression<Func<User, bool>> isActive = u => u.IsActive;
+Expression<Func<User, bool>> isAdult  = u => u.Age > 18;
+
+var combined  = isActive.And(isAdult);
+var either    = isActive.Or(isAdult);
+var negated   = isActive.Not();
+
+bool applyActiveFilter = request.FilterActiveOnly;
+var conditional = isActive.When(applyActiveFilter); // applies isActive only when condition is true
+
+// Aggregate a collection
+var all = new[] { isActive, isAdult }.CombineWithAnd();
+var any = new[] { isActive, isAdult }.CombineWithOr();
+```
+
+### Cloning & Modifying Specifications
+
+The library provides get / set / clear methods for the three core parts of a specification so you can clone and modify without affecting the original.
+
+#### Getting parts
+
+```csharp
+var spec = new Specification<User>();
+spec.Criteria = u => u.IsActive;
+spec.Include(u => u.Profile);
+spec.OrderBy(u => u.Name).ThenByDescending(u => u.CreatedAt);
+
+Expression<Func<User, bool>>? criteria = spec.GetQuerySpecification();
+var ordering  = spec.GetOrderBySpecifications(); // returns a copy
+var (includeExpressions, includeStrings, includeActions) = spec.GetIncludeSpecifications(); // returns copies
+```
+
+#### Setting parts
+
+```csharp
+spec.SetQuerySpecification(u => u.Age > 25);
+
+spec.SetOrderBySpecifications(new List<(Expression<Func<User, object>>, bool)>
+{
+    (u => u.Email, false),    // ascending
+    (u => u.CreatedAt, true)  // descending
+});
+
+spec.SetIncludeSpecifications(includeExpressions, includeStrings, includeActions);
+```
+
+#### Clearing parts
+
+```csharp
+spec.SetQuerySpecification(null);   // clear criteria
+spec.ClearOrderBySpecifications();  // clear all ordering
+spec.ClearIncludeSpecifications();  // clear all includes
+```
+
+#### Full clone example
+
+```csharp
+var baseSpec = new Specification<User> { Criteria = u => u.IsActive, AsNoTracking = true };
+baseSpec.Include(u => u.Profile);
+baseSpec.Include(u => u.Orders);
+baseSpec.OrderBy(u => u.Name);
+
+// Clone, keep everything, change only ordering
+var sortedByDate = new Specification<User>
+{
+    Criteria     = baseSpec.GetQuerySpecification(),
+    AsNoTracking = baseSpec.AsNoTracking,
+    AsSplitQuery = baseSpec.AsSplitQuery
+};
+var includes = baseSpec.GetIncludeSpecifications();
+sortedByDate.SetIncludeSpecifications(includes.IncludeExpressions, includes.IncludeStrings, includes.IncludeActions);
+sortedByDate.OrderByDescending(u => u.CreatedAt);
+
+// Clone, keep everything, change only criteria
+var premiumUsers = new Specification<User>
+{
+    AsNoTracking = baseSpec.AsNoTracking,
+    AsSplitQuery = baseSpec.AsSplitQuery
+};
+premiumUsers.SetQuerySpecification(u => u.IsActive && u.IsPremium);
+premiumUsers.SetOrderBySpecifications(baseSpec.GetOrderBySpecifications());
+var baseIncludes = baseSpec.GetIncludeSpecifications();
+premiumUsers.SetIncludeSpecifications(baseIncludes.IncludeExpressions, baseIncludes.IncludeStrings, baseIncludes.IncludeActions);
+```
+
+**Important semantics:**
+- `Get*` returns **copies** — mutating the returned list does not affect the original.
+- `Set*` **replaces** (clears existing data before applying).
+- Not thread-safe; do not share a `Specification` instance across threads.
+
+---
+
+## Repository Integration
+
+```csharp
+public class Repository<T> where T : class
+{
+    private readonly DbContext _context;
+    public Repository(DbContext context) => _context = context;
+
+    public async Task<List<T>> ListAsync(ISpecification<T> spec)
+        => await _context.Set<T>().ApplySpecification(spec).ToListAsync();
+
+    public async Task<T?> GetAsync(ISpecification<T> spec)
+        => await _context.Set<T>().ApplySpecification(spec).FirstOrDefaultAsync();
+}
+```
+
+---
+
+## CQRS Integration
+
+Implement `ISpecificationRequest<TEntity>` on your MediatR query/request classes.
+
+### Query class
+
+```csharp
+public class GetActiveUsersQuery : ISpecificationRequest<User>
+{
+    public string SearchTerm { get; set; }
+
+    public ISpecification<User> GetSpecification(bool asNoTracking = false, bool asSplitQuery = false)
+    {
+        var spec = new Specification<User>
+        {
+            AsNoTracking = asNoTracking,
+            AsSplitQuery = asSplitQuery
+        };
+
+        spec.Criteria = string.IsNullOrWhiteSpace(SearchTerm)
+            ? u => u.IsActive
+            : u => u.IsActive && u.Name.Contains(SearchTerm);
+
+        spec.Include(u => u.Profile);
+        spec.OrderBy(u => u.Name);
+
+        return spec;
+    }
+}
+```
+
+### Handler
+
+```csharp
+public class GetActiveUsersHandler
+{
+    private readonly ApplicationDbContext _context;
+    public GetActiveUsersHandler(ApplicationDbContext context) => _context = context;
+
+    public async Task<List<User>> Handle(GetActiveUsersQuery request)
+    {
+        var spec = request.GetSpecification(asNoTracking: true);
+        return await _context.Users.ApplySpecification(spec).ToListAsync();
+    }
+}
+```
+
+---
+
+## Full API Reference
+
+### Interfaces
+
+#### `ISpecification<TEntity>`
+
+Primary interface. All properties and methods below are available on any specification instance.
+
+| Member | Type | Description |
+|--------|------|-------------|
+| `Criteria` | `Expression<Func<TEntity, bool>>?` | WHERE filter expression |
+| `AsNoTracking` | `bool` | Disables EF change tracking |
+| `AsSplitQuery` | `bool` | Splits multi-collection includes into separate SQL queries |
+| `IncludeExpressions` | `List<Expression<Func<TEntity, object>>>` | Typed include expressions |
+| `IncludeStrings` | `List<string>` | String-path includes |
+| `IncludeActions` | `List<Func<IQueryable<TEntity>, IQueryable<TEntity>>>` | Consolidated include delegates (used by evaluator) |
+| `OrderByExpressions` | `List<(Expression<Func<TEntity, object>> KeySelector, bool IsDescending)>` | Ordered list of sort expressions |
+| `OrderByExpression` | `Expression<Func<TEntity, object>>?` | **(Obsolete)** Use `OrderBy()` instead |
+| `OrderByDescendingExpression` | `Expression<Func<TEntity, object>>?` | **(Obsolete)** Use `OrderByDescending()` instead |
+| `ProjectionExpression` | `Expression<Func<TEntity, object>>?` | SELECT projection expression |
+| `ExecuteUpdateExpression` | `Action<UpdateSettersBuilder<TEntity>>?` | Fluent bulk update setters |
+| `ExecuteUpdateProperties` | `List<Expression<Func<TEntity, object>>>` | Property selectors for object-based bulk update |
+| `PrimaryKey` | `object?` | Optional primary key value |
+| `GetQuerySpecification()` | method | Returns current `Criteria` (or null) |
+| `SetQuerySpecification(criteria)` | method | Replaces `Criteria` (pass null to clear) |
+| `GetOrderBySpecifications()` | method | Returns a **copy** of `OrderByExpressions` |
+| `SetOrderBySpecifications(list)` | method | Replaces all order-by expressions |
+| `ClearOrderBySpecifications()` | method | Clears all order-by expressions |
+| `GetIncludeSpecifications()` | method | Returns copies of all three include lists as a tuple |
+| `SetIncludeSpecifications(expressions, strings, actions)` | method | Replaces all include specifications |
+| `ClearIncludeSpecifications()` | method | Clears all include specifications |
+
+#### `IIncludableSpecification<TEntity, TProperty>`
+
+Returned by `Include()`. Extends `ISpecification<TEntity>`.
+
+| Member | Description |
+|--------|-------------|
+| `ThenInclude<TNextProperty>(Expression<Func<TProperty, TNextProperty>>)` | Chains a nested include (for single reference properties) |
+| `ThenInclude<TPreviousProperty, TNextProperty>(Expression<Func<TPreviousProperty, TNextProperty>>)` | Chains a nested include (for collection navigation properties) |
+| `Include<TNewProperty>(expression)` | Starts a new top-level include chain |
+| `IncludeString(path)` | Adds a string-path include |
+| `OrderBy<TNewProperty>(keySelector)` | Sets primary ascending sort |
+| `OrderByDescending<TNewProperty>(keySelector)` | Sets primary descending sort |
+
+#### `IOrderableSpecification<TEntity, TProperty>`
+
+Returned by `OrderBy()` / `OrderByDescending()`. Extends `ISpecification<TEntity>`.
+
+| Member | Description |
+|--------|-------------|
+| `ThenBy<TNextProperty>(keySelector)` | Appends an ascending secondary sort |
+| `ThenByDescending<TNextProperty>(keySelector)` | Appends a descending secondary sort |
+| `Include<TNewProperty>(expression)` | Starts a top-level include chain |
+| `IncludeString(path)` | Adds a string-path include |
+| `OrderBy<TNewProperty>(keySelector)` | Resets and sets new primary ascending sort |
+| `OrderByDescending<TNewProperty>(keySelector)` | Resets and sets new primary descending sort |
+
+#### `ISpecificationRequest<TEntity>`
+
+```csharp
+ISpecification<TEntity> GetSpecification(bool asNoTracking = false, bool asSplitQuery = false);
+```
+
+#### `ISpecificationForPrimaryKey`
+
+```csharp
+object? PrimaryKey { get; set; }
+```
+
+---
+
+### Classes
+
+#### `Specification<TEntity>`
+
+Concrete base class that implements `ISpecification<TEntity>`.
+
+**Constructors:**
+
+```csharp
+Specification()                                                  // Empty
+Specification(List<Expression<Func<TEntity, bool>>> expressions, CombineType combineType = CombineType.And, bool asNoTracking = false, bool asSplitQuery = false)
+Specification(object? primaryKey, bool asNoTracking = false, bool asSplitQuery = false) // By primary key
+```
+
+**Key methods (fluent return types):**
+
+```csharp
+IIncludableSpecification<TEntity, TProperty> Include<TProperty>(Expression<Func<TEntity, TProperty>> includeExpression)
+IIncludableSpecification<TEntity, object>    IncludeString(string includeString)
+IOrderableSpecification<TEntity, TProperty>  OrderBy<TProperty>(Expression<Func<TEntity, TProperty>> keySelector)
+IOrderableSpecification<TEntity, TProperty>  OrderByDescending<TProperty>(Expression<Func<TEntity, TProperty>> keySelector)
+```
+
+**Void methods:**
+
+```csharp
+void SetProjection(Expression<Func<TEntity, object>> projectionExpression)
+void SetExecuteUpdateExpression(Action<UpdateSettersBuilder<TEntity>> executeUpdateExpression)
+void AddExecuteUpdateProperties(Expression<Func<TEntity, object>> propertySelector)
+```
+
+**Static factory methods:**
+
+```csharp
+// With typed operator enum
+static Expression<Func<TEntity, bool>> ToConditionalExpression<TProperty>(
+    Expression<Func<TEntity, TProperty>> propertySelector,
+    TProperty value,
+    EqualOperation operation)
+
+static Expression<Func<TEntity, bool>> ToConditionalExpression<TProperty>(
+    Expression<Func<TEntity, TProperty>> propertySelector,
+    TProperty value,
+    CompareOperation operation)
+
+// With string operator prefix
+static Expression<Func<TEntity, bool>> ToConditionalExpression<TProperty>(
+    Expression<Func<TEntity, TProperty>> propertySelector,
+    string operatorAndValue)
+```
+
+**Obsolete methods (backward-compatible):**
+
+```csharp
+[Obsolete] IIncludableSpecification<TEntity, TProperty> AddInclude<TProperty>(Expression<Func<TEntity, TProperty>> includeExpression)
+[Obsolete] IIncludableSpecification<TEntity, object>    AddIncludeString(string includeString)
+[Obsolete] void AddOrderBy(Expression<Func<TEntity, object>> orderByExpression)
+[Obsolete] void AddOrderByDescending(Expression<Func<TEntity, object>> orderByDescendingExpression)
+```
+
+#### `ExpressionGenerator<TEntity>` (Static)
+
+```csharp
+// Build ExecuteUpdate expression from an entity model and selected property list
+static Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>>
+    BuildUpdateExpression(List<Expression<Func<TEntity, object>>> properties, TEntity model)
+
+// Build ExecuteUpdate expression from a dictionary of (propertyPath -> newValue)
+static Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>>
+    BuildUpdateExpression(Dictionary<string, object?> propertyUpdates)
+```
+
+#### `SpecificationEvaluator` (Static)
+
+```csharp
+// Extension methods
+IQueryable<TEntity> ApplySpecification<TEntity>(this IQueryable<TEntity> inputQueryable, ISpecification<TEntity> specification)
+IQueryable<TEntity> ApplySpecification<TEntity>(this DbSet<TEntity> query, ISpecification<TEntity> specification)
+IQueryable<TEntity> ApplySpecification<TEntity>(this DbContext dbContext, ISpecification<TEntity> specification)
+```
+
+**Evaluation order applied internally:**
+1. `AsNoTracking`
+2. All `IncludeActions` (consolidated from expressions, strings, and custom actions)
+3. `Criteria` (WHERE)
+4. `ProjectionExpression` (SELECT)
+5. `OrderByExpressions` (multi-level ORDER BY) — or legacy `OrderByExpression` / `OrderByDescendingExpression` as fallback
+6. `AsSplitQuery`
+
+#### `ExpressionBuilder` (Static Extension Methods)
+
+```csharp
+// Expression<Func<T, bool>> overloads
+Expression<Func<T, bool>> And(this Expression<Func<T, bool>> left, Expression<Func<T, bool>> right)
+Expression<Func<T, bool>> Or(this Expression<Func<T, bool>> left, Expression<Func<T, bool>> right)
+Expression<Func<T, bool>> Not(this Expression<Func<T, bool>> expression)
+Expression<Func<T, bool>> When(this Expression<Func<T, bool>> expression, bool condition)
+Expression<Func<T, bool>> CombineWithAnd(this IEnumerable<Expression<Func<T, bool>>> expressions)
+Expression<Func<T, bool>> CombineWithOr(this IEnumerable<Expression<Func<T, bool>>> expressions)
+Expression<Func<T, bool>> CombineWithNot(this IEnumerable<Expression<Func<T, bool>>> expressions)
+
+// Static helpers
+Expression<Func<TEntity, bool>> True<TEntity>()
+Expression<Func<TEntity, bool>> False<TEntity>()
+```
+
+---
+
+### Enums
+
+#### `CombineType`
+
+```csharp
+enum CombineType { And, Or }
+```
+
+Used in `Specification<TEntity>(List<Expression>, CombineType)` constructor.
+
+#### `EqualOperation`
+
+```csharp
+enum EqualOperation { Equal, NotEqual }
+```
+
+Used in `ToConditionalExpression`.
+
+#### `CompareOperation`
+
+```csharp
+enum CompareOperation { GreaterThan, GreaterThanOrEqual, LessThan, LessThanOrEqual }
+```
+
+Used in `ToConditionalExpression`.
+
+---
+
+## Internal Implementation Notes
+
+These types are `internal` and not part of the public API, but understanding them helps when reading the source or contributing.
+
+- **`IncludableSpecification<TEntity, TProperty>`** — wrapper returned by `Include()`; delegates all `ISpecification<TEntity>` members to the underlying `Specification<TEntity>` while preserving the typed `TProperty` for type-safe `ThenInclude` chaining.
+- **`OrderableSpecification<TEntity, TProperty>`** — wrapper returned by `OrderBy()`; delegates all members to the underlying `Specification<TEntity>` while preserving `TProperty` for `ThenBy` / `ThenByDescending` chaining.
+- `AppendThenInclude(navigationPropertyPath)` — internal method on `Specification<TEntity>` that appends a `ThenInclude` step to the last include action.
+- `AppendThenBy(keySelector, isDescending)` — internal method that appends an ordering step to `OrderByExpressions`.
+
+---
+
+## Best Practices
+
+1. **Encapsulation** — put complex query logic inside named `Specification` subclasses rather than building expressions in services or repositories.
+2. **Single Responsibility** — keep specifications focused; compose them via `ExpressionBuilder` if you need to combine criteria.
+3. **Read-only queries** — always set `AsNoTracking = true` for display/read queries to avoid unnecessary tracking overhead.
+4. **Pagination** — `ApplySpecification` returns an `IQueryable`; apply `.Skip()` and `.Take()` after calling it.
+5. **Indexes** — add database indexes on columns used in `OrderBy` or `Criteria` for optimal performance.
+6. **Avoid sharing instances** — specifications are not thread-safe; create a new instance per request.
+7. **Migrate from obsolete API** — replace `AddOrderBy()` / `AddOrderByDescending()` with `OrderBy()` / `OrderByDescending()`.
