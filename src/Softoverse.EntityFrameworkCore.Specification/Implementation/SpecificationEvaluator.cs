@@ -1,4 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Linq.Expressions;
+
+using Microsoft.EntityFrameworkCore;
 
 using Softoverse.EntityFrameworkCore.Specification.Abstraction;
 
@@ -32,13 +34,13 @@ public static class SpecificationEvaluator
             queryable = queryable.Where(specification.Criteria);
         }
 
-        // Apply projection
-        if (specification.ProjectionExpression is not null)
-        {
-            // Note: Select() followed by OfType<TEntity>() might not be what's always intended if TResult != TEntity,
-            // but we'll keep the existing logic for now.
-            queryable = queryable.Select(specification.ProjectionExpression).OfType<TEntity>();
-        }
+        // // Apply projection
+        // if (specification.ProjectionExpression is not null)
+        // {
+        //     // Note: Select() followed by OfType<TEntity>() might not be what's always intended if TResult != TEntity,
+        //     // but we'll keep the existing logic for now.
+        //     queryable = queryable.Select(specification.ProjectionExpression).OfType<TEntity>();
+        // }
 
         // Apply ordering using the new OrderByExpressions collection
         if (specification.OrderByExpressions.Any())
@@ -86,6 +88,22 @@ public static class SpecificationEvaluator
         }
 
         return queryable;
+    }
+    
+    public static IQueryable<TResult> ApplyProjection<TEntity, TResult>(this IQueryable<TEntity> query, ISpecification<TEntity> specification) where TEntity : class
+    {
+        var body = specification.ProjectionExpression.Body;
+
+        // Unwrap the implicit boxing Convert(new TResult { ... }, object) added by the compiler
+        // when the lambda is stored as Expression<Func<TEntity, object>>.
+        if (body is UnaryExpression { NodeType: ExpressionType.Convert } convert
+         && convert.Type == typeof(object))
+        {
+            body = convert.Operand;
+        }
+
+        var typedExpr = Expression.Lambda<Func<TEntity, TResult>>(body, specification.ProjectionExpression.Parameters);
+        return query.Select(typedExpr);
     }
 
     public static IQueryable<TEntity> ApplySpecification<TEntity>(this DbSet<TEntity> query, ISpecification<TEntity> specification) where TEntity : class

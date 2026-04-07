@@ -31,7 +31,6 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
         _entity = _dbContext.Set<TEntity>();
     }
 
-
     public virtual async Task<TEntity?> GetByIdAsync(TKey id, CancellationToken cancellationToken = default)
     {
         return await _entity.FindAsync([id], cancellationToken);
@@ -45,10 +44,24 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
         return await query.FirstOrDefaultAsync(expression, cancellationToken);
     }
 
+    public async Task<TResult?> GetAsync<TResult>(Expression<Func<TEntity, bool>> expression,
+                                                  bool asNoTracking = false,
+                                                  CancellationToken cancellationToken = default)
+    {
+        var query = asNoTracking ? _entity.AsNoTracking() : _entity;
+        return await query.Where(expression).ProjectTo<TEntity, TResult>().FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<TEntity?> GetAsync(ISpecification<TEntity> specification, CancellationToken cancellationToken = default)
     {
         var query = _entity.ApplySpecification(specification);
         return await query.FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<TResult?> GetAsync<TResult>(ISpecification<TEntity> specification, CancellationToken cancellationToken = default)
+    {
+        var query = _entity.ApplySpecification(specification);
+        return await query.ProjectTo<TEntity, TResult>().FirstOrDefaultAsync(cancellationToken);
     }
 
     public virtual async Task<bool> ExistsByAsync(Expression<Func<TEntity, bool>> expression,
@@ -94,8 +107,7 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
         }
         else
         {
-            newQuery = query.Select(specification.ProjectionExpression!)
-                            .OfType<TResult>();
+            newQuery = query.ApplyProjection<TEntity, TResult>(specification);
         }
 
         newQuery = sortable.ApplySorting(newQuery);
@@ -179,7 +191,6 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
                                                                             CancellationToken cancellationToken = default)
     {
         sortable ??= new Sortable();
-
         IQueryable<TEntity> query = _entity.ApplySpecification(specification);
 
         IQueryable<TResult> newQuery;
@@ -189,8 +200,7 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
         }
         else
         {
-            newQuery = query.Select(specification.ProjectionExpression!)
-                            .OfType<TResult>();
+            newQuery = query.ApplyProjection<TEntity, TResult>(specification);
         }
 
         newQuery = sortable.ApplySorting(newQuery);
@@ -259,8 +269,8 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
     }
 
     public static async Task<PagedData<TResult>> GetAllPagedAsync<TResult>(IQueryable<TResult> query,
-                                                                            Pageable? pageable,
-                                                                            CancellationToken cancellationToken = default)
+                                                                           Pageable? pageable,
+                                                                           CancellationToken cancellationToken = default)
     {
         pageable ??= new Pageable();
 
@@ -463,8 +473,7 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
         }
         else
         {
-            newQuery = query.Select(specification.ProjectionExpression!)
-                            .OfType<TResult>();
+            newQuery = query.ApplyProjection<TEntity, TResult>(specification);
         }
 
         await foreach (var item in newQuery.AsAsyncEnumerable().WithCancellation(cancellationToken))
@@ -472,7 +481,6 @@ public abstract class RepositoryBase<TEntity, TKey> : IRepositoryBase<TEntity, T
             yield return item;
         }
     }
-
 
     public virtual async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

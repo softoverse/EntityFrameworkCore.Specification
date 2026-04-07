@@ -4,7 +4,6 @@ using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 
 using Softoverse.EntityFrameworkCore.Specification.Abstraction;
-using Softoverse.EntityFrameworkCore.Specification.Extensions;
 using Softoverse.EntityFrameworkCore.Specification.Helpers;
 using Softoverse.EntityFrameworkCore.Specification.Implementation;
 
@@ -18,6 +17,7 @@ public class Program
     private static ApplicationDbContext _context;
     private static IRepositoryBase<Country, long> _countryRepository;
     private static IRepositoryBase<City, long> _cityRepository;
+    private static IRepositoryBase<District, long> _districtRepository;
 
     public static async Task Main(string[] args)
     {
@@ -31,6 +31,7 @@ public class Program
         await TestSimpleInclude();
         await TestThenInclude();
         await TestMultiLevelThenInclude();
+        await TestMultilevelProjectionAsync();
         await TestMixedIncludesAndFilters();
         await TestFilteredInclude();
         await TestFilteredThenInclude();
@@ -71,6 +72,7 @@ public class Program
         await DatabaseInitializer.EnsureTablesCreatedAsync(_context);
         _countryRepository = new CountryRepository(_context);
         _cityRepository = new CityRepository(_context);
+        _districtRepository = new DistrictRepository(_context);
     }
 
     private static async Task SeedDatabase()
@@ -445,6 +447,43 @@ public class Program
         Console.WriteLine();
     }
 
+    private static async Task TestMultilevelProjectionAsync()
+    {
+        Console.WriteLine("=== Test 3: Multiple level projection ThenInclude Chains (3 levels deep) ===");
+        
+        var specification = new Specification<District>
+        {
+            Criteria = c => c.Name == "Brooklyn",
+            AsNoTracking = true
+        };
+        
+        // Chain multiple ThenInclude calls - automatic type inference!
+        specification
+            .Include(c => c.City)
+            .ThenInclude(d => d.Country);
+        
+        specification.SetProjection(c=>new DistrictDto
+        {
+            DistrictName = c.Name,
+            CityName = c.City.Name,
+            CountryName= c.City.Country.Name,
+        });
+        
+        var districts = await _districtRepository.GetAllAsync<DistrictDto>(specification);
+        
+        if (districts != null && districts.Count > 0)
+        {
+            Console.WriteLine($"Total Districts: {districts?.Count ?? 0}");
+                
+                foreach (var district in districts)
+                {
+                    Console.WriteLine($"\n  District: {district.DistrictName}");
+                    Console.WriteLine($"\n  City: {district.CityName} (Country: {district.CountryName})");
+                }
+        }
+        Console.WriteLine();
+    }
+    
     private static async Task TestMixedIncludesAndFilters()
     {
         Console.WriteLine("=== Test 4: Mixed Includes with Filters ===");

@@ -162,8 +162,17 @@ spec.OrderByDescending(p => p.IsFeatured)
 
 ### Projections
 
+Use `SetProjection` to define a projection on the specification. **Projection is not applied automatically** by `ApplySpecification` — you must call `ApplyProjection<TResult>()` manually after applying the specification.
+
 ```csharp
-spec.SetProjection(u => new { u.Id, u.FullName });
+// 1. Define the projection on the spec
+spec.SetProjection(u => new UserDto { Id = u.Id, FullName = u.FullName });
+
+// 2. Apply spec (filtering, includes, ordering) — projection is NOT applied here
+var query = _context.Users.ApplySpecification(spec);
+
+// 3. Apply projection manually
+var results = await query.ApplyProjection<User, UserDto>(spec).ToListAsync();
 ```
 
 ### No-Tracking & Split Queries
@@ -573,15 +582,19 @@ static Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>>
 IQueryable<TEntity> ApplySpecification<TEntity>(this IQueryable<TEntity> inputQueryable, ISpecification<TEntity> specification)
 IQueryable<TEntity> ApplySpecification<TEntity>(this DbSet<TEntity> query, ISpecification<TEntity> specification)
 IQueryable<TEntity> ApplySpecification<TEntity>(this DbContext dbContext, ISpecification<TEntity> specification)
+
+// Projection must be applied manually after ApplySpecification
+IQueryable<TResult> ApplyProjection<TEntity, TResult>(this IQueryable<TEntity> query, ISpecification<TEntity> specification)
 ```
 
-**Evaluation order applied internally:**
+**Evaluation order applied internally by `ApplySpecification`:**
 1. `AsNoTracking`
 2. All `IncludeActions` (consolidated from expressions, strings, and custom actions)
 3. `Criteria` (WHERE)
-4. `ProjectionExpression` (SELECT)
-5. `OrderByExpressions` (multi-level ORDER BY) — or legacy `OrderByExpression` / `OrderByDescendingExpression` as fallback
-6. `AsSplitQuery`
+4. `OrderByExpressions` (multi-level ORDER BY) — or legacy `OrderByExpression` / `OrderByDescendingExpression` as fallback
+5. `AsSplitQuery`
+
+> **Note:** `ProjectionExpression` is **not** applied by `ApplySpecification`. Call `ApplyProjection<TEntity, TResult>()` separately when projection is needed.
 
 #### `ExpressionBuilder` (Static Extension Methods)
 

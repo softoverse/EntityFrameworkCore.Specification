@@ -4,11 +4,11 @@ using TestConsole.Models;
 
 namespace TestConsole.DataAccess;
 
-public interface ICountryRepository : IRepository<Country, long>
+public interface IDistrictRepository : IRepository<District, long>
 {
 
 }
 
-public class CountryRepository(ApplicationDbContext dbContext)
-    : GenericRepository<Country, long>(dbContext),
-      ICountryRepository;
+public class DistrictRepository(ApplicationDbContext dbContext)
+    : GenericRepository<District, long>(dbContext),
+      IDistrictRepository;

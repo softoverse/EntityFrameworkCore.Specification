@@ -1,6 +1,6 @@
 # Softoverse.EntityFrameworkCore.Specification
 
-> A Specification Pattern library for Entity Framework Core (.NET 6+). Provides a fluent API for composing and reusing EF Core queries through `ISpecification<TEntity>` — covering filtering, eager loading, ordering, projections, bulk updates, and dynamic expression generation.
+> A Specification Pattern library for Entity Framework Core (.NET 6+). Provides a fluent API for composing and reusing EF Core queries through `ISpecification<TEntity>` — covering filtering, eager loading, ordering, bulk updates, and dynamic expression generation. Projections are defined via `SetProjection` and applied **manually** with `ApplyProjection<TResult>()` after `ApplySpecification`.
 
 - **NuGet**: `Softoverse.EntityFrameworkCore.Specification`
 - **License**: Apache 2.0

@@ -193,9 +193,17 @@ spec.OrderBy(u => u.Name);
 ```
 
 ### Projections
-Use `SetProjection` to select only the fields you need.
+Use `SetProjection` to define a projection on the specification, then apply it **manually** with `ApplyProjection<TResult>()` after calling `ApplySpecification`. Projection is **not** applied automatically by `ApplySpecification`.
+
 ```csharp
-spec.SetProjection(u => new { u.Id, u.FullName });
+// 1. Define the projection on the spec
+spec.SetProjection(u => new UserDto { Id = u.Id, FullName = u.FullName });
+
+// 2. Apply spec (filtering, ordering, includes) — projection is NOT applied here
+var query = _context.Users.ApplySpecification(spec);
+
+// 3. Apply projection manually
+var results = await query.ApplyProjection<User, UserDto>(spec).ToListAsync();
 ```
 
 ### No-Tracking & Split Queries
@@ -553,8 +561,11 @@ Used in `ToConditionalExpression` to define comparison logic.
 
 ### Extension Methods
 
+### Extension Methods
+
 #### `SpecificationEvaluator`
-- `ApplySpecification(queryable, specification)`: Applies all specification logic to an `IQueryable`.
+- `ApplySpecification(queryable, specification)`: Applies filtering, includes, ordering, and query options (no-tracking, split-query) to an `IQueryable`. **Does not apply projection.**
+- `ApplyProjection<TEntity, TResult>(queryable, specification)`: Applies the `ProjectionExpression` from the specification to the queryable. Must be called **manually** after `ApplySpecification` when a projection is needed.
 - `ApplySpecification(dbSet, specification)`: Helper for `DbSet`.
 - `ApplySpecification(dbContext, specification)`: Helper for `DbContext`.
 
